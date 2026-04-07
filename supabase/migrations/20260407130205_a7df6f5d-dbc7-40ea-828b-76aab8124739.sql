@@ -1,0 +1,3 @@
+ALTER TABLE public.audit_item_responses
+ADD CONSTRAINT audit_item_responses_audit_checklist_unique
+UNIQUE (audit_id, checklist_item_id);
