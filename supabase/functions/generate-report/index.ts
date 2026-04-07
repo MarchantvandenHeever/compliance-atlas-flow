@@ -24,6 +24,19 @@ interface ReportRequest {
   reportNumber?: string;
   author?: string;
   reviewer?: string;
+  clientLogoUrl?: string;
+}
+
+// Fetch image as base64 data URL
+async function fetchImageBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const ct = res.headers.get("content-type") || "image/png";
+    return `data:${ct};base64,${b64}`;
+  } catch { return null; }
 }
 
 Deno.serve(async (req) => {
@@ -54,7 +67,18 @@ Deno.serve(async (req) => {
       reviewer = "Reviewer",
       projectId,
       auditId,
+      clientLogoUrl,
     } = body;
+
+    // Fetch CES logo
+    const cesLogoUrl = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/branding/ces-logo.png`;
+    const cesLogoData = await fetchImageBase64(cesLogoUrl);
+
+    // Fetch client logo if provided
+    let clientLogoData: string | null = null;
+    if (clientLogoUrl) {
+      clientLogoData = await fetchImageBase64(clientLogoUrl);
+    }
 
     // Fetch audit data if auditId provided
     let auditData: any = null;
@@ -150,14 +174,23 @@ Deno.serve(async (req) => {
     doc.setFillColor(...TEAL);
     doc.rect(0, 0, pageW, 8, "F");
 
-    // Company name
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.text("CES", margin, 35);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Environmental and Social Advisory Services", margin, 42);
+    // CES Logo
+    if (cesLogoData) {
+      doc.addImage(cesLogoData, "PNG", margin, 20, 50, 15);
+    } else {
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.text("CES", margin, 35);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Environmental and Social Advisory Services", margin, 42);
+    }
+
+    // Client logo (top right)
+    if (clientLogoData) {
+      doc.addImage(clientLogoData, "PNG", pageW - margin - 40, 20, 40, 15);
+    }
 
     // Report title block
     doc.setFillColor(...TEAL);
