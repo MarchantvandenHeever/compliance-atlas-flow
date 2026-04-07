@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut
 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,6 +20,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const { profile, roles, signOut } = useAuth();
+
+  const initials = profile?.display_name
+    ? profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : '??';
+
+  const roleLabel = roles.length > 0
+    ? roles[0].replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())
+    : 'User';
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -82,17 +92,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Footer with user info */}
         {!collapsed && (
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <span className="text-xs font-medium">BG</span>
+                <span className="text-xs font-medium">{initials}</span>
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">Brain Green</p>
-                <p className="text-[10px] text-sidebar-foreground/60">ECO Auditor</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{profile?.display_name || 'User'}</p>
+                <p className="text-[10px] text-sidebar-foreground/60">{roleLabel}</p>
               </div>
+              <button
+                onClick={signOut}
+                className="text-sidebar-foreground/40 hover:text-sidebar-foreground p-1 transition-colors"
+                title="Sign out"
+              >
+                <LogOut size={14} />
+              </button>
             </div>
           </div>
         )}
