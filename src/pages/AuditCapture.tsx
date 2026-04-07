@@ -112,6 +112,14 @@ export default function AuditCapture() {
     setExpandedRows(prev => { const n = new Set(prev); n.has(itemId) ? n.delete(itemId) : n.add(itemId); return n; });
   }, []);
 
+  const toggleSectionActive = useCallback((sectionId: string) => {
+    setInactiveSections(prev => {
+      const n = new Set(prev);
+      n.has(sectionId) ? n.delete(sectionId) : n.add(sectionId);
+      return n;
+    });
+  }, []);
+
   const setStatus = useCallback((itemId: string, status: ComplianceStatus) => {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], status, lastEditedAt: new Date().toISOString() } }));
   }, []);
