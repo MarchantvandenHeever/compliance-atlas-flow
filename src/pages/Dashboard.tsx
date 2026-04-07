@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Minus, TrendingUp, ClipboardCheck, Calendar, AlertTriangle, FileCheck, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -6,6 +7,9 @@ import { sampleAuditData, defaultTemplate } from '@/data/checklistData';
 import { useAuditInstances } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 const COLORS = ['#0096A6', '#ef4444', '#9ca3af'];
 
