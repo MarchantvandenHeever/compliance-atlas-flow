@@ -15,6 +15,7 @@ import Reports from "@/pages/Reports";
 import Templates from "@/pages/Templates";
 import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound.tsx";
+import Users from "@/pages/Users";
 
 const queryClient = new QueryClient();
 

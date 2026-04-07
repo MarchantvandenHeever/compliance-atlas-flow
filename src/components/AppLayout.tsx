@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import cesLogo from '@/assets/ces-logo.png';
