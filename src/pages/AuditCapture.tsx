@@ -310,18 +310,47 @@ export default function AuditCapture() {
         })()}
       </div>
 
+      {isAmendmentsRequested && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 space-y-3">
+          <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <MessageSquare size={14} />
+            <span className="font-medium">Amendments requested by reviewer — address the comments below then resubmit.</span>
+          </div>
+          {reviewComments && reviewComments.filter(c => c.status === 'open').length > 0 && (
+            <div className="space-y-2">
+              {reviewComments.filter(c => c.status === 'open').map(c => (
+                <div key={c.id} className="flex items-start gap-2 bg-white border rounded-md px-3 py-2 text-sm">
+                  <MessageSquare size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="flex-1 break-words">{c.comment}</p>
+                  <button onClick={() => resolveComment.mutate({ commentId: c.id, auditId: c.audit_id })}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors flex-shrink-0">
+                    <CheckCircle2 size={10} /> Resolve
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {isLocked && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between bg-muted/50 border rounded-lg px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Lock size={14} />
-            <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+            <span className="font-medium">
+              {currentAuditInstance?.status === 'approved' ? 'This audit has been approved.' :
+               currentAuditInstance?.status === 'under_review' ? 'This audit is under review.' :
+               'This audit has been submitted and is locked.'}
+            </span>
             {revisionCount > 0 && <span className="text-xs opacity-75">• Revision {revisionCount}{lastRevisedAt ? ` (${new Date(lastRevisedAt).toLocaleDateString()})` : ''}</span>}
           </div>
-          <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
-            {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-            Reopen for Revision
-          </button>
+          {(currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved') && (
+            <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
+              {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+              Reopen for Revision
+            </button>
+          )}
         </div>
       )}
 
