@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import cesLogo from '@/assets/ces-logo.png';
@@ -16,7 +16,8 @@ const navItems = [
   { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/templates', icon: Settings, label: 'Templates' },
   { to: '/users', icon: Shield, label: 'Users' },
-];
+  { to: '/onboarding', icon: UserPlus, label: 'Client Onboarding', adminOnly: true },
+] as const;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
