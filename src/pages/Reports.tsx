@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, Plus, Calendar, User, Eye, Loader2 } from 'lucide-react';
+import { FileText, Download, Plus, Calendar, User, Eye, Loader2, Upload, Image } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuditInstances } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
@@ -9,11 +9,32 @@ import { toast } from 'sonner';
 
 export default function Reports() {
   const [generating, setGenerating] = useState<string | null>(null);
+  const [clientLogoUrl, setClientLogoUrl] = useState<string>('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoRef = useRef<HTMLInputElement>(null);
   const { data: audits } = useAuditInstances();
   const { data: projects } = useProjects();
   const { profile } = useAuth();
 
-  // Static reports + any DB audits
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const path = `branding/client-logo-${Date.now()}.${file.name.split('.').pop()}`;
+      const { error } = await supabase.storage.from('audit-photos').upload(path, file, { upsert: true });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage.from('audit-photos').getPublicUrl(path);
+      setClientLogoUrl(urlData.publicUrl);
+      toast.success('Client logo uploaded');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload logo');
+    } finally {
+      setUploadingLogo(false);
+      if (logoRef.current) logoRef.current.value = '';
+    }
+  };
+
   const staticReports = [
     { id: 'r-5', title: 'Construction Audit Report 5', period: 'Mar 2026', status: 'Draft', author: 'Brain Green', reviewer: 'Charl Kruger', date: '01 Apr 2026', compliance: 100 },
     { id: 'r-4', title: 'Construction Audit Report 4', period: 'Feb 2026', status: 'Submitted', author: 'Brain Green', reviewer: 'Charl Kruger', date: '03 Mar 2026', compliance: 99 },
@@ -22,7 +43,7 @@ export default function Reports() {
     { id: 'r-1', title: 'Construction Audit Report 1', period: 'Nov 2025', status: 'Submitted', author: 'Brain Green', reviewer: 'Charl Kruger', date: '01 Dec 2025', compliance: 95 },
   ];
 
-  const dbReports = audits?.map((a, i) => ({
+  const dbReports = audits?.map((a) => ({
     id: a.id,
     title: `${(projects?.find(p => p.id === a.project_id) as any)?.name || 'Audit'} - ${a.period}`,
     period: a.period,
@@ -42,22 +63,20 @@ export default function Reports() {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const url = `https://${projectId}.supabase.co/functions/v1/generate-report`;
 
-      const body: any = {
+      const reqBody: any = {
         reportTitle: report.title,
         reportNumber: `Report ${allReports.indexOf(report) + 1}`,
         period: report.period,
         author: report.author,
         reviewer: report.reviewer,
       };
-
-      // If this is a DB audit, pass auditId so the function can fetch real data
+      if (clientLogoUrl) reqBody.clientLogoUrl = clientLogoUrl;
       if ('auditId' in report) {
-        body.auditId = (report as any).auditId;
-        body.projectId = (report as any).projectId;
+        reqBody.auditId = (report as any).auditId;
+        reqBody.projectId = (report as any).projectId;
       }
 
       const response = await fetch(url, {
@@ -67,7 +86,7 @@ export default function Reports() {
           'Authorization': `Bearer ${token}`,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(reqBody),
       });
 
       if (!response.ok) {
@@ -84,7 +103,6 @@ export default function Reports() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
-
       toast.success('Report downloaded successfully');
     } catch (err: any) {
       console.error('PDF generation error:', err);
@@ -99,9 +117,17 @@ export default function Reports() {
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
-
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const url = `https://${projectId}.supabase.co/functions/v1/generate-report`;
+
+      const reqBody: any = {
+        reportTitle: 'Monthly Environmental Audit Report',
+        reportNumber: 'Report ' + (allReports.length + 1),
+        period: new Date().toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }),
+        author: profile?.display_name || 'ECO Auditor',
+        reviewer: 'Reviewer',
+      };
+      if (clientLogoUrl) reqBody.clientLogoUrl = clientLogoUrl;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -110,13 +136,7 @@ export default function Reports() {
           'Authorization': `Bearer ${token}`,
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
         },
-        body: JSON.stringify({
-          reportTitle: 'Monthly Environmental Audit Report',
-          reportNumber: 'Report ' + (allReports.length + 1),
-          period: new Date().toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }),
-          author: profile?.display_name || 'ECO Auditor',
-          reviewer: 'Reviewer',
-        }),
+        body: JSON.stringify(reqBody),
       });
 
       if (!response.ok) throw new Error('Failed to generate');
@@ -130,7 +150,6 @@ export default function Reports() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
-
       toast.success('Monthly report generated');
     } catch (err: any) {
       toast.error(err.message || 'Failed to generate report');
@@ -151,6 +170,35 @@ export default function Reports() {
           {generating === 'new' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
           Generate Report
         </button>
+      </div>
+
+      {/* Client Logo Upload */}
+      <div className="bg-card border rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
+              <Image size={18} />
+            </div>
+            <div>
+              <h4 className="text-sm font-semibold">Client Logo for Reports</h4>
+              <p className="text-xs text-muted-foreground">Upload a client logo to appear on the cover page alongside the CES logo.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {clientLogoUrl && (
+              <img src={clientLogoUrl} alt="Client logo" className="h-10 w-auto rounded border bg-white p-1" />
+            )}
+            <input ref={logoRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+            <button onClick={() => logoRef.current?.click()} disabled={uploadingLogo}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-sm font-medium hover:bg-muted/50 disabled:opacity-50 transition-colors">
+              {uploadingLogo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {clientLogoUrl ? 'Change Logo' : 'Upload Logo'}
+            </button>
+            {clientLogoUrl && (
+              <button onClick={() => setClientLogoUrl('')} className="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
