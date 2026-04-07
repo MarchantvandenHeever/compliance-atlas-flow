@@ -351,6 +351,7 @@ export default function AuditCapture() {
                 {isSectionInactive && <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-700">Inactive</span>}
                 <span className="text-xs text-muted-foreground">{sectionResponded}/{sectionItemCount}</span>
                 <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${sectionItemCount ? (sectionResponded / sectionItemCount) * 100 : 0}%` }} /></div>
+                {!isLocked && (
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleSectionActive(section.id); }}
                   className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${isSectionInactive ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary' : 'bg-primary/10 text-primary hover:bg-muted hover:text-muted-foreground'}`}
@@ -358,6 +359,7 @@ export default function AuditCapture() {
                 >
                   {isSectionInactive ? 'Activate' : 'Deactivate'}
                 </button>
+                )}
               </div>
               <AnimatePresence>
                 {isExpanded && (
@@ -391,8 +393,8 @@ export default function AuditCapture() {
                                         </button>
                                         <div className="flex gap-1 flex-shrink-0">
                                           {STATUS_OPTIONS.map(opt => (
-                                            <button key={opt.value} onClick={() => setStatus(item.id, opt.value)}
-                                              className={`px-2 py-1 rounded text-xs font-medium transition-all ${response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`} title={opt.label}>
+                                            <button key={opt.value} onClick={() => !isLocked && setStatus(item.id, opt.value)} disabled={isLocked}
+                                              className={`px-2 py-1 rounded text-xs font-medium transition-all ${response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'} ${isLocked ? 'cursor-not-allowed' : ''}`} title={opt.label}>
                                               {opt.shortLabel}
                                             </button>
                                           ))}
@@ -404,20 +406,20 @@ export default function AuditCapture() {
                                             <div className="px-4 pb-3 pl-16 grid grid-cols-1 md:grid-cols-2 gap-3">
                                               <div>
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Audit Evidence / Comments</label>
-                                                <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)} placeholder="Enter audit observations..." rows={3}
-                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)} placeholder="Enter audit observations..." rows={3} disabled={isLocked}
+                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div>
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Actions / Recommendations</label>
-                                                <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)} placeholder="Enter corrective actions..." rows={3}
-                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)} placeholder="Enter corrective actions..." rows={3} disabled={isLocked}
+                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div className="md:col-span-2">
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
                                                 <PhotoUpload responseId={response?.id || item.id}
                                                   photos={response?.photos?.map(p => ({ url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: '' })) || []}
                                                   onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation })))}
-                                                  disabled={false} />
+                                                  disabled={isLocked} />
                                               </div>
                                             </div>
                                           </motion.div>
