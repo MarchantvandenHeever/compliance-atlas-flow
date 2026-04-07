@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';

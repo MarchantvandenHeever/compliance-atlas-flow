@@ -124,6 +124,69 @@ export function useSubmitAudit() {
   });
 }
 
+export function useReopenAudit() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ auditId, reason }: { auditId: string; reason?: string }) => {
+      // Get current audit to know revision count and status
+      const { data: audit, error: fetchErr } = await supabase
+        .from('audit_instances')
+        .select('revision_count, status')
+        .eq('id', auditId)
+        .single();
+      if (fetchErr) throw fetchErr;
+
+      const newRevision = (audit.revision_count || 0) + 1;
+
+      // Log the revision
+      const { error: logErr } = await supabase
+        .from('audit_revision_log')
+        .insert({
+          audit_id: auditId,
+          revised_by: user?.id || '',
+          revision_number: newRevision,
+          reason: reason || null,
+          previous_status: audit.status,
+        });
+      if (logErr) throw logErr;
+
+      // Reopen the audit
+      const { error } = await supabase
+        .from('audit_instances')
+        .update({
+          status: 'draft',
+          revision_count: newRevision,
+          last_revised_at: new Date().toISOString(),
+        })
+        .eq('id', auditId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['audit-instances'] });
+      toast.success('Audit reopened for revision');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useRevisionLog(auditId?: string) {
+  return useQuery({
+    queryKey: ['revision-log', auditId],
+    queryFn: async () => {
+      if (!auditId) return [];
+      const { data, error } = await supabase
+        .from('audit_revision_log')
+        .select('*')
+        .eq('audit_id', auditId)
+        .order('revised_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!auditId,
+  });
+}
+
 export function useSaveAuditResponses() {
   const qc = useQueryClient();
   const { user } = useAuth();
