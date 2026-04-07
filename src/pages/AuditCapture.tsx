@@ -229,6 +229,13 @@ export default function AuditCapture() {
     await submitAudit.mutateAsync(id);
   };
 
+  const handleReopenAudit = async () => {
+    if (!auditId) return;
+    const reason = prompt('Reason for revision (optional):');
+    if (reason === null) return; // cancelled
+    await reopenAudit.mutateAsync({ auditId, reason: reason || undefined });
+  };
+
   const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
 
   return (
@@ -301,9 +308,17 @@ export default function AuditCapture() {
       </div>
 
       {isLocked && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
-          <Lock size={14} />
-          <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
+          <div className="flex items-center gap-2">
+            <Lock size={14} />
+            <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+            {revisionCount > 0 && <span className="text-xs opacity-75">• Revision {revisionCount}{lastRevisedAt ? ` (${new Date(lastRevisedAt).toLocaleDateString()})` : ''}</span>}
+          </div>
+          <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
+            {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+            Reopen for Revision
+          </button>
         </div>
       )}
 
@@ -314,7 +329,7 @@ export default function AuditCapture() {
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}` : auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
+            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}${revisionCount > 0 ? ` • Rev ${revisionCount}` : ''}` : auditId ? `Audit in progress${revisionCount > 0 ? ` (Revision ${revisionCount})` : ''}` : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
         </div>
         <div className="flex items-center gap-2">
