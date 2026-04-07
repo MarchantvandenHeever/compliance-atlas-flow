@@ -55,6 +55,31 @@ export function useTemplateItems(sectionIds?: string[]) {
   });
 }
 
+export function useDeleteTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      // Delete items, sections, then template (cascade would also work if FK set)
+      const { data: sections } = await supabase
+        .from('checklist_sections')
+        .select('id')
+        .eq('template_id', templateId);
+      if (sections?.length) {
+        const sIds = sections.map(s => s.id);
+        await supabase.from('checklist_items').delete().in('section_id', sIds);
+      }
+      await supabase.from('checklist_sections').delete().eq('template_id', templateId);
+      const { error } = await supabase.from('checklist_templates').delete().eq('id', templateId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['templates'] });
+      toast.success('Template deleted');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useImportChecklist() {
   const qc = useQueryClient();
   const { profile } = useAuth();
