@@ -104,6 +104,12 @@ Deno.serve(async (req) => {
       responses = resp || [];
       photos = responses.flatMap((r: any) => (r.response_photos || []).map((p: any) => ({ ...p, responseId: r.id })));
 
+      // Fetch section overrides (active/inactive phases)
+      const { data: sectionOverrides } = await supabase
+        .from("audit_section_overrides")
+        .select("*")
+        .eq("audit_id", auditId);
+
       if (audit?.template_id) {
         const { data: secs } = await supabase
           .from("checklist_sections")
@@ -112,14 +118,34 @@ Deno.serve(async (req) => {
           .order("sort_order");
         sections = secs || [];
 
-        const sectionIds = sections.map((s: any) => s.id);
-        if (sectionIds.length > 0) {
-          const { data: itms } = await supabase
-            .from("checklist_items")
+        // Mark inactive sections
+        const inactiveSectionIds = new Set(
+          (sectionOverrides || []).filter((o: any) => !o.is_active).map((o: any) => o.section_id)
+        );
+        sections = sections.map((s: any) => ({ ...s, _inactive: inactiveSectionIds.has(s.id) }));
+
+        const activeSectionIds = sections.filter((s: any) => !s._inactive).map((s: any) => s.id);
+        const allSectionIds = sections.map((s: any) => s.id);
+
+        if (allSectionIds.length > 0) {
+          const { data: objs } = await supabase
+            .from("checklist_objectives")
             .select("*")
-            .in("section_id", sectionIds)
+            .in("section_id", allSectionIds)
             .order("sort_order");
-          items = itms || [];
+
+          const objectiveIds = (objs || []).map((o: any) => o.id);
+          if (objectiveIds.length > 0) {
+            const { data: itms } = await supabase
+              .from("checklist_items")
+              .select("*")
+              .in("objective_id", objectiveIds)
+              .order("sort_order");
+            items = (itms || []).map((i: any) => {
+              const obj = (objs || []).find((o: any) => o.id === i.objective_id);
+              return { ...i, section_id: obj?.section_id };
+            });
+          }
         }
       }
     } else if (projectId) {
