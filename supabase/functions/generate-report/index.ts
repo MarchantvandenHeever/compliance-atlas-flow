@@ -428,7 +428,7 @@ Deno.serve(async (req) => {
         margin: { left: margin, right: margin },
         headStyles: { fillColor: RED, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE },
-        columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 45 }, 2: { cellWidth: 30 }, 3: { cellWidth: 40 }, 4: { cellWidth: 35 } },
+        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
@@ -457,7 +457,7 @@ Deno.serve(async (req) => {
         margin: { left: margin, right: margin },
         headStyles: { fillColor: GREEN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE },
-        columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 45 }, 2: { cellWidth: 30 }, 3: { cellWidth: 40 }, 4: { cellWidth: 35 } },
+        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
@@ -486,7 +486,7 @@ Deno.serve(async (req) => {
         margin: { left: margin, right: margin },
         headStyles: { fillColor: GREY, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE },
-        columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 45 }, 2: { cellWidth: 30 }, 3: { cellWidth: 40 }, 4: { cellWidth: 35 } },
+        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
@@ -665,7 +665,7 @@ Deno.serve(async (req) => {
           margin: { left: margin, right: margin },
           headStyles: { fillColor: AMBER, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
           bodyStyles: { fontSize: 7, textColor: SLATE },
-          columnStyles: { 0: { cellWidth: 13 }, 1: { cellWidth: 45 }, 2: { cellWidth: 28 }, 3: { cellWidth: 15, halign: "center" }, 4: { cellWidth: 15, halign: "center" }, 5: { cellWidth: 40 } },
+          columnStyles: { 0: { cellWidth: 13 }, 3: { cellWidth: 15, halign: "center" }, 4: { cellWidth: 15, halign: "center" } },
           didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
         });
 
