@@ -67,7 +67,18 @@ Deno.serve(async (req) => {
       reviewer = "Reviewer",
       projectId,
       auditId,
+      clientLogoUrl,
     } = body;
+
+    // Fetch CES logo
+    const cesLogoUrl = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/branding/ces-logo.png`;
+    const cesLogoData = await fetchImageBase64(cesLogoUrl);
+
+    // Fetch client logo if provided
+    let clientLogoData: string | null = null;
+    if (clientLogoUrl) {
+      clientLogoData = await fetchImageBase64(clientLogoUrl);
+    }
 
     // Fetch audit data if auditId provided
     let auditData: any = null;
