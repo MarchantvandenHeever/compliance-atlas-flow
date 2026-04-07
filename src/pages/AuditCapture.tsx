@@ -352,7 +352,7 @@ export default function AuditCapture() {
           )}
           {isLocked && (
             <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium">
-              <Lock size={14} /> Submitted
+              <Lock size={14} /> Locked
             </span>
           )}
         </div>
