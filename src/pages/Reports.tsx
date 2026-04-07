@@ -160,7 +160,9 @@ export default function Reports() {
                       {(audit as any).revision_count > 0 && <span>Rev {(audit as any).revision_count}</span>}
                     </div>
                   </div>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-md bg-green-100 text-green-700`}>{audit.status}</span>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${audit.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {audit.status === 'approved' ? '✅ Reviewed & Approved' : '⏳ Pending Review'}
+                  </span>
                   <Link to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
                     className="text-xs text-primary hover:underline">View</Link>
                   <button onClick={() => generatePDF(audit)} disabled={generating === audit.id}

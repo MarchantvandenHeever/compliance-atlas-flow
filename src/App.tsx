@@ -17,6 +17,7 @@ import Auth from "@/pages/Auth";
 import NotFound from "./pages/NotFound.tsx";
 import Users from "@/pages/Users";
 import ClientOnboarding from "@/pages/ClientOnboarding";
+import Reviews from "@/pages/Reviews";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
                       <Route path="/templates" element={<Templates />} />
                       <Route path="/users" element={<Users />} />
                       <Route path="/onboarding" element={<ClientOnboarding />} />
+                      <Route path="/reviews" element={<Reviews />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

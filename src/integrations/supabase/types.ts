@@ -396,6 +396,44 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          audit_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          audit_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          audit_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organisations: {
         Row: {
           created_at: string
@@ -595,6 +633,54 @@ export type Database = {
           },
         ]
       }
+      review_comments: {
+        Row: {
+          audit_id: string
+          checklist_item_id: string | null
+          comment: string
+          created_at: string
+          id: string
+          reviewer_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          checklist_item_id?: string | null
+          comment: string
+          created_at?: string
+          id?: string
+          reviewer_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          checklist_item_id?: string | null
+          comment?: string
+          created_at?: string
+          id?: string
+          reviewer_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_comments_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_comments_checklist_item_id_fkey"
+            columns: ["checklist_item_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -631,7 +717,12 @@ export type Database = {
       action_severity: "low" | "medium" | "high"
       action_status: "open" | "in_progress" | "closed"
       app_role: "admin" | "eco_auditor" | "reviewer" | "client_viewer"
-      audit_status: "draft" | "submitted" | "approved"
+      audit_status:
+        | "draft"
+        | "submitted"
+        | "approved"
+        | "under_review"
+        | "amendments_requested"
       audit_type: "daily" | "weekly" | "monthly"
       checklist_source: "EA" | "EMPr"
       compliance_status: "C" | "NC" | "NA"
@@ -766,7 +857,13 @@ export const Constants = {
       action_severity: ["low", "medium", "high"],
       action_status: ["open", "in_progress", "closed"],
       app_role: ["admin", "eco_auditor", "reviewer", "client_viewer"],
-      audit_status: ["draft", "submitted", "approved"],
+      audit_status: [
+        "draft",
+        "submitted",
+        "approved",
+        "under_review",
+        "amendments_requested",
+      ],
       audit_type: ["daily", "weekly", "monthly"],
       checklist_source: ["EA", "EMPr"],
       compliance_status: ["C", "NC", "NA"],

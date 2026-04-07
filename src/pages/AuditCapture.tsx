@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
+import { useSubmitForReview, useReviewComments, useResolveReviewComment } from '@/hooks/useReviewData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
@@ -39,13 +40,16 @@ export default function AuditCapture() {
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
-  const submitAudit = useSubmitAudit();
+  const submitForReview = useSubmitForReview();
+  const { data: reviewComments } = useReviewComments(auditId || undefined);
+  const resolveComment = useResolveReviewComment();
   const reopenAudit = useReopenAudit();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
   const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
-  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
+  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved' || currentAuditInstance?.status === 'under_review';
+  const isAmendmentsRequested = currentAuditInstance?.status === 'amendments_requested' as any;
   const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
   const lastRevisedAt = (currentAuditInstance as any)?.last_revised_at;
 
@@ -221,12 +225,11 @@ export default function AuditCapture() {
 
   const handleSubmitAudit = async () => {
     if (!auditId && !projectId) return;
-    // Save first, then submit
     await handleSaveDraft();
     const id = auditId || searchParams.get('auditId');
     if (!id) return;
-    if (!confirm('Are you sure you want to submit this audit? It will be locked for further editing.')) return;
-    await submitAudit.mutateAsync(id);
+    if (!confirm('Submit this audit for review? A reviewer will be notified.')) return;
+    await submitForReview.mutateAsync(id);
   };
 
   const handleReopenAudit = async () => {
@@ -307,18 +310,47 @@ export default function AuditCapture() {
         })()}
       </div>
 
+      {isAmendmentsRequested && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 space-y-3">
+          <div className="flex items-center gap-2 text-amber-800 text-sm">
+            <MessageSquare size={14} />
+            <span className="font-medium">Amendments requested by reviewer — address the comments below then resubmit.</span>
+          </div>
+          {reviewComments && reviewComments.filter(c => c.status === 'open').length > 0 && (
+            <div className="space-y-2">
+              {reviewComments.filter(c => c.status === 'open').map(c => (
+                <div key={c.id} className="flex items-start gap-2 bg-white border rounded-md px-3 py-2 text-sm">
+                  <MessageSquare size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                  <p className="flex-1 break-words">{c.comment}</p>
+                  <button onClick={() => resolveComment.mutate({ commentId: c.id, auditId: c.audit_id })}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors flex-shrink-0">
+                    <CheckCircle2 size={10} /> Resolve
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {isLocked && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between bg-muted/50 border rounded-lg px-4 py-2.5 text-sm">
+          <div className="flex items-center gap-2 text-muted-foreground">
             <Lock size={14} />
-            <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+            <span className="font-medium">
+              {currentAuditInstance?.status === 'approved' ? 'This audit has been approved.' :
+               currentAuditInstance?.status === 'under_review' ? 'This audit is under review.' :
+               'This audit has been submitted and is locked.'}
+            </span>
             {revisionCount > 0 && <span className="text-xs opacity-75">• Revision {revisionCount}{lastRevisedAt ? ` (${new Date(lastRevisedAt).toLocaleDateString()})` : ''}</span>}
           </div>
-          <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
-            {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
-            Reopen for Revision
-          </button>
+          {(currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved') && (
+            <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
+              {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+              Reopen for Revision
+            </button>
+          )}
         </div>
       )}
 
@@ -355,17 +387,31 @@ export default function AuditCapture() {
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          {!isLocked && (
+          {!isLocked && !isAmendmentsRequested && (
             <>
               <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
                 {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save Draft
               </button>
-              <button onClick={handleSubmitAudit} disabled={submitAudit.isPending || saveResponses.isPending || completionPct === 0}
+              <button onClick={handleSubmitAudit} disabled={submitForReview.isPending || saveResponses.isPending || completionPct === 0}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
-                {submitAudit.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Submit Audit
+                {submitForReview.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Submit for Review
+              </button>
+            </>
+          )}
+          {isAmendmentsRequested && (
+            <>
+              <button onClick={handleSaveDraft} disabled={saveResponses.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                {saveResponses.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Changes
+              </button>
+              <button onClick={handleSubmitAudit} disabled={submitForReview.isPending || saveResponses.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {submitForReview.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Resubmit for Review
               </button>
             </>
           )}
