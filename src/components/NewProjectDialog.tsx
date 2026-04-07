@@ -14,10 +14,21 @@ export default function NewProjectDialog() {
   const createProject = useCreateProject();
   const { data: templates } = useTemplates();
 
+  const { data: orgs } = useQuery({
+    queryKey: ['organisations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('organisations').select('*').order('name');
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const selectedOrg = orgs?.find(o => o.id === form.client);
     await createProject.mutateAsync({
       ...form,
+      client: selectedOrg?.name || form.client,
       template_id: form.template_id || undefined,
     });
     setOpen(false);
@@ -40,7 +51,10 @@ export default function NewProjectDialog() {
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Client *</label>
-            <Input required value={form.client} onChange={e => setForm(p => ({ ...p, client: e.target.value }))} placeholder="e.g. Eskom Holdings" />
+            <select required value={form.client} onChange={e => setForm(p => ({ ...p, client: e.target.value }))} className="w-full h-10 rounded-md border bg-background px-3 text-sm">
+              <option value="">Select a client…</option>
+              {orgs?.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+            </select>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">Location</label>
