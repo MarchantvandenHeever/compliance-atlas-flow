@@ -315,18 +315,6 @@ export default function Templates() {
                               <span className="text-xs text-muted-foreground">{objItems.length} tasks</span>
                             </button>
 
-                            {isObjExpanded && (
-                              <div className="px-5 pb-3 pl-10">
-                                <div className="bg-muted/20 rounded-md divide-y divide-border">
-                                  {objItems.map(item => (
-                                    <div key={item.id} className="px-3 py-2 text-xs flex gap-3">
-                                      <span className="text-muted-foreground w-12 flex-shrink-0">{item.condition_ref}</span>
-                                      <span className="text-foreground">{item.description}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         );
                       })}
