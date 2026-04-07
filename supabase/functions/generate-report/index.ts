@@ -498,7 +498,7 @@ Deno.serve(async (req) => {
       const sNA = sectionResponses.filter((r: any) => r.status === "NA").length;
       const sTotal = sC + sNC;
       const sPct = sTotal > 0 ? Math.round((sC / sTotal) * 100) : 0;
-      return [s.name, s.source, String(sC), String(sNC), String(sNA), `${sPct}%`];
+      return [s._inactive ? `${s.name} (INACTIVE)` : s.name, s.source, s._inactive ? "-" : String(sC), s._inactive ? "-" : String(sNC), s._inactive ? "-" : String(sNA), s._inactive ? "N/A" : `${sPct}%`];
     });
 
     if (sectionStats.length > 0) {
@@ -603,8 +603,12 @@ Deno.serve(async (req) => {
     const checklistRows: any[] = [];
     for (const section of sections) {
       // Add section header row
+      const sectionLabel = section._inactive
+        ? `${section.source} - ${section.name} [INACTIVE - Not assessed in this audit]`
+        : `${section.source} - ${section.name}`;
+      const headerColor = section._inactive ? [120, 120, 120] : SLATE;
       checklistRows.push([
-        { content: `${section.source} - ${section.name}`, colSpan: 5, styles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
+        { content: sectionLabel, colSpan: 5, styles: { fillColor: headerColor, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
       ]);
 
       const sectionItems = items.filter((i: any) => i.section_id === section.id);
