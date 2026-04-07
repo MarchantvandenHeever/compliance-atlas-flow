@@ -119,6 +119,45 @@ export type Database = {
           },
         ]
       }
+      audit_section_overrides: {
+        Row: {
+          audit_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          section_id: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          section_id: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          section_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_section_overrides_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_instances"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_section_overrides_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_sections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checklist_items: {
         Row: {
           condition_ref: string | null

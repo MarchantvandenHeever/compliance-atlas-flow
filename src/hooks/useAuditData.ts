@@ -65,6 +65,47 @@ export function useCreateAudit() {
   });
 }
 
+export function useAuditSectionOverrides(auditId?: string) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['audit-section-overrides', auditId],
+    queryFn: async () => {
+      if (!auditId) return [];
+      const { data, error } = await supabase
+        .from('audit_section_overrides')
+        .select('*')
+        .eq('audit_id', auditId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!auditId,
+  });
+}
+
+export function useSaveAuditSectionOverrides() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ auditId, overrides }: {
+      auditId: string;
+      overrides: Array<{ section_id: string; is_active: boolean }>;
+    }) => {
+      const upserts = overrides.map(o => ({
+        audit_id: auditId,
+        section_id: o.section_id,
+        is_active: o.is_active,
+      }));
+      const { error } = await supabase
+        .from('audit_section_overrides')
+        .upsert(upserts, { onConflict: 'audit_id,section_id', ignoreDuplicates: false });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['audit-section-overrides', vars.auditId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useSaveAuditResponses() {
   const qc = useQueryClient();
   const { user } = useAuth();

@@ -104,6 +104,12 @@ Deno.serve(async (req) => {
       responses = resp || [];
       photos = responses.flatMap((r: any) => (r.response_photos || []).map((p: any) => ({ ...p, responseId: r.id })));
 
+      // Fetch section overrides (active/inactive phases)
+      const { data: sectionOverrides } = await supabase
+        .from("audit_section_overrides")
+        .select("*")
+        .eq("audit_id", auditId);
+
       if (audit?.template_id) {
         const { data: secs } = await supabase
           .from("checklist_sections")
@@ -112,14 +118,34 @@ Deno.serve(async (req) => {
           .order("sort_order");
         sections = secs || [];
 
-        const sectionIds = sections.map((s: any) => s.id);
-        if (sectionIds.length > 0) {
-          const { data: itms } = await supabase
-            .from("checklist_items")
+        // Mark inactive sections
+        const inactiveSectionIds = new Set(
+          (sectionOverrides || []).filter((o: any) => !o.is_active).map((o: any) => o.section_id)
+        );
+        sections = sections.map((s: any) => ({ ...s, _inactive: inactiveSectionIds.has(s.id) }));
+
+        const activeSectionIds = sections.filter((s: any) => !s._inactive).map((s: any) => s.id);
+        const allSectionIds = sections.map((s: any) => s.id);
+
+        if (allSectionIds.length > 0) {
+          const { data: objs } = await supabase
+            .from("checklist_objectives")
             .select("*")
-            .in("section_id", sectionIds)
+            .in("section_id", allSectionIds)
             .order("sort_order");
-          items = itms || [];
+
+          const objectiveIds = (objs || []).map((o: any) => o.id);
+          if (objectiveIds.length > 0) {
+            const { data: itms } = await supabase
+              .from("checklist_items")
+              .select("*")
+              .in("objective_id", objectiveIds)
+              .order("sort_order");
+            items = (itms || []).map((i: any) => {
+              const obj = (objs || []).find((o: any) => o.id === i.objective_id);
+              return { ...i, section_id: obj?.section_id };
+            });
+          }
         }
       }
     } else if (projectId) {
@@ -131,10 +157,18 @@ Deno.serve(async (req) => {
       projectData = project;
     }
 
-    // Calculate compliance metrics
-    const compliantCount = responses.filter((r: any) => r.status === "C").length;
-    const ncCount = responses.filter((r: any) => r.status === "NC").length;
-    const naCount = responses.filter((r: any) => r.status === "NA").length;
+    // Determine active vs inactive items
+    const activeSections = sections.filter((s: any) => !s._inactive);
+    const inactiveSections = sections.filter((s: any) => s._inactive);
+    const activeSectionIds = new Set(activeSections.map((s: any) => s.id));
+    const activeItems = items.filter((i: any) => activeSectionIds.has(i.section_id));
+    const activeItemIds = new Set(activeItems.map((i: any) => i.id));
+
+    // Calculate compliance metrics (only active sections)
+    const activeResponses = responses.filter((r: any) => activeItemIds.has(r.checklist_item_id));
+    const compliantCount = activeResponses.filter((r: any) => r.status === "C").length;
+    const ncCount = activeResponses.filter((r: any) => r.status === "NC").length;
+    const naCount = activeResponses.filter((r: any) => r.status === "NA").length;
     const totalAssessed = compliantCount + ncCount;
     const compliancePercent = totalAssessed > 0
       ? Math.round((compliantCount / totalAssessed) * 100)
@@ -359,7 +393,13 @@ Deno.serve(async (req) => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE);
-    const methodText = `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.\n\nCompliance was rated using the following scale:\n\n• C (Compliant) - The condition has been met\n• NC (Non-Compliant) - The condition has not been met\n• N/A (Not Applicable) - The condition is not applicable to the current phase\n\nThe compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`;
+    let methodText = `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.\n\nCompliance was rated using the following scale:\n\n• C (Compliant) - The condition has been met\n• NC (Non-Compliant) - The condition has not been met\n• N/A (Not Applicable) - The condition is not applicable to the current phase\n\nThe compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`;
+
+    if (inactiveSections.length > 0) {
+      const inactiveNames = inactiveSections.map((s: any) => s.name).join(", ");
+      methodText += `\n\nThe following phase(s) were marked as inactive and were therefore not considered as part of this audit: ${inactiveNames}. Items within inactive phases are excluded from the compliance calculations.`;
+    }
+
     const methodLines = doc.splitTextToSize(methodText, contentW);
     doc.text(methodLines, margin, y);
     y += methodLines.length * 5 + 15;
@@ -458,7 +498,7 @@ Deno.serve(async (req) => {
       const sNA = sectionResponses.filter((r: any) => r.status === "NA").length;
       const sTotal = sC + sNC;
       const sPct = sTotal > 0 ? Math.round((sC / sTotal) * 100) : 0;
-      return [s.name, s.source, String(sC), String(sNC), String(sNA), `${sPct}%`];
+      return [s._inactive ? `${s.name} (INACTIVE)` : s.name, s.source, s._inactive ? "-" : String(sC), s._inactive ? "-" : String(sNC), s._inactive ? "-" : String(sNA), s._inactive ? "N/A" : `${sPct}%`];
     });
 
     if (sectionStats.length > 0) {
@@ -563,8 +603,12 @@ Deno.serve(async (req) => {
     const checklistRows: any[] = [];
     for (const section of sections) {
       // Add section header row
+      const sectionLabel = section._inactive
+        ? `${section.source} - ${section.name} [INACTIVE - Not assessed in this audit]`
+        : `${section.source} - ${section.name}`;
+      const headerColor = section._inactive ? [120, 120, 120] : SLATE;
       checklistRows.push([
-        { content: `${section.source} - ${section.name}`, colSpan: 5, styles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
+        { content: sectionLabel, colSpan: 5, styles: { fillColor: headerColor, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
       ]);
 
       const sectionItems = items.filter((i: any) => i.section_id === section.id);
