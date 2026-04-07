@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { CheckCircle2, XCircle, Minus, TrendingUp, ClipboardCheck, Calendar, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, Minus, TrendingUp, ClipboardCheck, Calendar, AlertTriangle, FileCheck, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import MetricCard from '@/components/MetricCard';
 import { sampleAuditData, defaultTemplate } from '@/data/checklistData';
@@ -17,6 +17,13 @@ export default function Dashboard() {
   const projectName = projects?.[0]?.name || sampleAuditData.project.name;
   const auditCount = audits?.length || 0;
   const draftCount = audits?.filter(a => a.status === 'draft').length || 0;
+  const submittedCount = audits?.filter(a => a.status === 'submitted').length || 0;
+
+  // Recent audits sorted by most recent first
+  const recentAudits = audits
+    ?.slice()
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+    .slice(0, 5) || [];
 
   const currentMetrics = sampleAuditData.monthlyTrend[sampleAuditData.monthlyTrend.length - 1];
   const prevMetrics = sampleAuditData.monthlyTrend[sampleAuditData.monthlyTrend.length - 2];
@@ -119,8 +126,51 @@ export default function Dashboard() {
         </Link>
       </div>
 
+      {/* Recent Audits from DB */}
+      {recentAudits.length > 0 && (
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-card rounded-lg border">
+          <div className="p-4 border-b flex items-center justify-between">
+            <h3 className="text-sm font-semibold flex items-center gap-2"><FileCheck size={16} className="text-primary" /> Recent Audits</h3>
+            <span className="text-xs text-muted-foreground">{auditCount} total • {draftCount} drafts • {submittedCount} submitted</span>
+          </div>
+          <div className="divide-y">
+            {recentAudits.map(audit => {
+              const project = projects?.find(p => p.id === audit.project_id);
+              const statusStyles: Record<string, string> = {
+                draft: 'bg-amber-100 text-amber-700',
+                submitted: 'bg-green-100 text-green-700',
+                approved: 'bg-primary/10 text-primary',
+              };
+              return (
+                <Link
+                  key={audit.id}
+                  to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-muted/20 transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                      {project?.name || 'Unknown Project'} — {audit.period}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {audit.type} audit • Updated {new Date(audit.updated_at).toLocaleDateString()}
+                      {audit.submitted_at && ` • Submitted ${new Date(audit.submitted_at).toLocaleDateString()}`}
+                      {(audit as any).revision_count > 0 && ` • Rev ${(audit as any).revision_count}`}
+                    </p>
+                  </div>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${statusStyles[audit.status] || 'bg-muted text-muted-foreground'}`}>
+                    {audit.status}
+                  </span>
+                  <ArrowRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                </Link>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Sample Audit History (fallback) */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-card rounded-lg border">
-        <div className="p-4 border-b"><h3 className="text-sm font-semibold">Recent Audit History</h3></div>
+        <div className="p-4 border-b"><h3 className="text-sm font-semibold">Sample Audit History</h3></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
