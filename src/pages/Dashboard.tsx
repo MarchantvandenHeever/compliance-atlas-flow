@@ -14,10 +14,48 @@ import { useAuth } from '@/contexts/AuthContext';
 const COLORS = ['#0096A6', '#ef4444', '#9ca3af'];
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { data: projects } = useProjects();
   const { data: audits } = useAuditInstances();
 
-  // Use DB data summary or fallback to sample
+  // Fetch all responses for completed audits to calculate real metrics
+  const completedAuditIds = useMemo(() =>
+    (audits?.filter(a => a.status === 'submitted' || a.status === 'approved') || []).map(a => a.id),
+    [audits]
+  );
+
+  const { data: allResponses } = useQuery({
+    queryKey: ['dashboard-responses', completedAuditIds],
+    queryFn: async () => {
+      if (!completedAuditIds.length) return [];
+      const { data, error } = await supabase
+        .from('audit_item_responses')
+        .select('audit_id, status')
+        .in('audit_id', completedAuditIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && completedAuditIds.length > 0,
+  });
+
+  // Build per-audit metrics
+  const auditMetrics = useMemo(() => {
+    if (!allResponses || !audits) return [];
+    return audits
+      .filter(a => a.status === 'submitted' || a.status === 'approved')
+      .sort((a, b) => new Date(b.submitted_at || b.updated_at).getTime() - new Date(a.submitted_at || a.updated_at).getTime())
+      .map(audit => {
+        const responses = allResponses.filter(r => r.audit_id === audit.id);
+        const compliant = responses.filter(r => r.status === 'C').length;
+        const nonCompliant = responses.filter(r => r.status === 'NC').length;
+        const noted = responses.filter(r => r.status === 'NA').length;
+        const assessed = compliant + nonCompliant + noted;
+        const compliance = assessed > 0 ? Math.round((compliant / assessed) * 100) : 0;
+        const project = projects?.find(p => p.id === audit.project_id);
+        return { audit, project, compliant, nonCompliant, noted, assessed, compliance };
+      });
+  }, [allResponses, audits, projects]);
+
   const projectName = projects?.[0]?.name || sampleAuditData.project.name;
   const auditCount = audits?.length || 0;
   const draftCount = audits?.filter(a => a.status === 'draft').length || 0;
