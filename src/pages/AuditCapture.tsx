@@ -322,7 +322,26 @@ export default function AuditCapture() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Revision Log */}
+      {revisionLog && revisionLog.length > 0 && (
+        <details className="bg-card border rounded-lg overflow-hidden">
+          <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-muted/30 text-sm font-medium">
+            <History size={14} className="text-muted-foreground" />
+            Revision History ({revisionLog.length})
+          </summary>
+          <div className="border-t divide-y">
+            {revisionLog.map(log => (
+              <div key={log.id} className="px-4 py-2 text-xs flex items-center gap-4">
+                <span className="font-medium text-foreground">Rev {log.revision_number}</span>
+                <span className="text-muted-foreground">{new Date(log.revised_at).toLocaleString()}</span>
+                <span className="text-muted-foreground">from <span className="font-medium">{log.previous_status}</span></span>
+                {log.reason && <span className="text-muted-foreground italic">— {log.reason}</span>}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold font-display">
