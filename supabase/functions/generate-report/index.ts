@@ -174,14 +174,23 @@ Deno.serve(async (req) => {
     doc.setFillColor(...TEAL);
     doc.rect(0, 0, pageW, 8, "F");
 
-    // Company name
-    doc.setFontSize(14);
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.text("CES", margin, 35);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text("Environmental and Social Advisory Services", margin, 42);
+    // CES Logo
+    if (cesLogoData) {
+      doc.addImage(cesLogoData, "PNG", margin, 20, 50, 15);
+    } else {
+      doc.setFontSize(14);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.text("CES", margin, 35);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text("Environmental and Social Advisory Services", margin, 42);
+    }
+
+    // Client logo (top right)
+    if (clientLogoData) {
+      doc.addImage(clientLogoData, "PNG", pageW - margin - 40, 20, 40, 15);
+    }
 
     // Report title block
     doc.setFillColor(...TEAL);
