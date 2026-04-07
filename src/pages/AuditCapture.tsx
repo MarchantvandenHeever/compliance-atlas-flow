@@ -147,9 +147,21 @@ export default function AuditCapture() {
     });
   }, [items, searchQuery, statusFilter, responses]);
 
+  // Get active item IDs (exclude items in inactive sections)
+  const activeItemIds = useMemo(() => {
+    if (!has3Level && !objectives.length) return new Set(items.map(i => i.id));
+    const activeSectionIds = sections.filter(s => !inactiveSections.has(s.id)).map(s => s.id);
+    const activeObjIds = objectives.filter(o => activeSectionIds.includes(o.sectionId)).map(o => o.id);
+    return new Set(items.filter(i => 'objectiveId' in i ? activeObjIds.includes((i as any).objectiveId) : true).map(i => i.id));
+  }, [items, sections, objectives, inactiveSections, has3Level]);
+
   const allResponses = useMemo(() => Object.values(responses).filter(r => r.status) as AuditItemResponse[], [responses]);
-  const metrics = calculateCompliance(allResponses, items.length);
-  const completionPct = Math.round(((metrics.compliantCount + metrics.nonCompliantCount + metrics.notedCount) / metrics.totalItems) * 100);
+  const activeResponses = useMemo(() => {
+    return Object.entries(responses).filter(([id, r]) => r.status && activeItemIds.has(id)).map(([_, r]) => r) as AuditItemResponse[];
+  }, [responses, activeItemIds]);
+  const activeItemCount = useMemo(() => items.filter(i => activeItemIds.has(i.id)).length, [items, activeItemIds]);
+  const metrics = calculateCompliance(activeResponses, activeItemCount);
+  const completionPct = activeItemCount > 0 ? Math.round(((metrics.compliantCount + metrics.nonCompliantCount + metrics.notedCount) / metrics.totalItems) * 100) : 0;
 
   const handleSaveDraft = async () => {
     if (!auditId) {
@@ -164,7 +176,13 @@ export default function AuditCapture() {
         status: (r.status === 'N/A' ? 'NA' : r.status) as 'C' | 'NC' | 'NA' | null,
         comments: r.comments || '', actions: r.actions || '',
       }));
-    await saveResponses.mutateAsync({ auditId, responses: responsesToSave });
+
+    // Save section overrides alongside responses
+    const overrides = sections.map(s => ({ section_id: s.id, is_active: !inactiveSections.has(s.id) }));
+    await Promise.all([
+      saveResponses.mutateAsync({ auditId, responses: responsesToSave }),
+      saveSectionOverrides.mutateAsync({ auditId, overrides }),
+    ]);
   };
 
   const has3Level = objectives.length > 0;
