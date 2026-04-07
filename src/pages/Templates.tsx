@@ -56,7 +56,7 @@ export default function Templates() {
       type ObjItem = { name: string; source: 'EA' | 'EMPr'; tasks: TaskItem[] };
       type PhaseItem = { name: string; source: 'EA' | 'EMPr'; objectives: ObjItem[] };
       const phasesMap = new Map<string, PhaseItem>();
-      const skipSheetPattern = /contents|summary|cover|index|^toc$/i;
+      const skipSheetPattern = /contents|summary|cover|index|^toc$|all\s*conditions/i;
 
       for (const sheetName of wb.SheetNames) {
         if (skipSheetPattern.test(sheetName)) continue;
@@ -95,7 +95,7 @@ export default function Templates() {
           const refVal = refCol >= 0 ? String(row[refCol] || '').trim() : '';
 
           // Update current phase/objective when a new value appears
-          if (rawPhase) currentPhaseName = rawPhase;
+          if (rawPhase && !/all\s*conditions/i.test(rawPhase)) currentPhaseName = rawPhase;
           if (rawObj) currentObjName = rawObj;
 
           // If no phase name yet, use the sheet name
@@ -281,7 +281,7 @@ export default function Templates() {
           </div>
 
           <div className="divide-y">
-            {dbSections.map(phase => {
+            {dbSections.filter(p => !/all\s*conditions/i.test(p.name)).map(phase => {
               const phaseObjectives = dbObjectives?.filter(o => o.section_id === phase.id) || [];
               const isPhaseExpanded = expandedPhases.has(phase.id);
               const phaseItemCount = phaseObjectives.reduce((acc, obj) => {
