@@ -215,8 +215,16 @@ export default function AuditCapture() {
     ]);
   };
 
+  const handleSubmitAudit = async () => {
+    if (!auditId && !projectId) return;
+    // Save first, then submit
+    await handleSaveDraft();
+    const id = auditId || searchParams.get('auditId');
+    if (!id) return;
+    if (!confirm('Are you sure you want to submit this audit? It will be locked for further editing.')) return;
+    await submitAudit.mutateAsync(id);
+  };
 
-  // Project navigation helpers
   const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
 
   return (
@@ -267,18 +275,32 @@ export default function AuditCapture() {
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
+            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}` : auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-            {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Save Draft
-          </button>
+          {!isLocked && (
+            <>
+              <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Draft
+              </button>
+              <button onClick={handleSubmitAudit} disabled={submitAudit.isPending || saveResponses.isPending || completionPct === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {submitAudit.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Submit Audit
+              </button>
+            </>
+          )}
+          {isLocked && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium">
+              <Lock size={14} /> Submitted
+            </span>
+          )}
         </div>
       </div>
 
