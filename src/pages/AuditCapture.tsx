@@ -282,6 +282,7 @@ export default function AuditCapture() {
       <div className="space-y-2">
         {sections.filter(s => sourceFilter === 'all' || s.source === sourceFilter).map(section => {
           const isExpanded = expandedSections.has(section.id);
+          const isSectionInactive = inactiveSections.has(section.id);
           const sectionObjectives = has3Level
             ? objectives.filter(o => o.sectionId === section.id)
             : [{ id: section.id, name: section.name, sectionId: section.id, source: section.source, order: 0 }];
@@ -290,14 +291,24 @@ export default function AuditCapture() {
           const sectionResponded = sectionObjectives.reduce((acc, obj) => acc + getFilteredItems(obj.id).filter(i => responses[i.id]?.status).length, 0);
 
           return (
-            <div key={section.id} className="bg-card border rounded-lg overflow-hidden">
-              <button onClick={() => toggleSection(section.id)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>{section.source}</span>
-                <span className="text-sm font-semibold flex-1">{section.name}</span>
+            <div key={section.id} className={`bg-card border rounded-lg overflow-hidden ${isSectionInactive ? 'opacity-60' : ''}`}>
+              <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+                <button onClick={() => toggleSection(section.id)} className="flex items-center gap-3 flex-1 text-left">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>{section.source}</span>
+                  <span className={`text-sm font-semibold flex-1 ${isSectionInactive ? 'line-through text-muted-foreground' : ''}`}>{section.name}</span>
+                </button>
+                {isSectionInactive && <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-700">Inactive</span>}
                 <span className="text-xs text-muted-foreground">{sectionResponded}/{sectionItemCount}</span>
                 <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${sectionItemCount ? (sectionResponded / sectionItemCount) * 100 : 0}%` }} /></div>
-              </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); toggleSectionActive(section.id); }}
+                  className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${isSectionInactive ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary' : 'bg-primary/10 text-primary hover:bg-muted hover:text-muted-foreground'}`}
+                  title={isSectionInactive ? 'Mark phase as active' : 'Mark phase as inactive'}
+                >
+                  {isSectionInactive ? 'Activate' : 'Deactivate'}
+                </button>
+              </div>
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
