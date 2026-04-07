@@ -45,6 +45,8 @@ export default function AuditCapture() {
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
   const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
 
+  const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
+
   const items = useMemo(() => {
     if (dbItems?.length) return dbItems.map(i => ({
       id: i.id, objectiveId: i.objective_id, conditionRef: i.condition_ref || '', description: i.description,
