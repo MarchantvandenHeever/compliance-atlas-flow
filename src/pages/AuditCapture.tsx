@@ -187,7 +187,6 @@ export default function AuditCapture() {
     ]);
   };
 
-  const has3Level = objectives.length > 0;
 
   // Project navigation helpers
   const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
