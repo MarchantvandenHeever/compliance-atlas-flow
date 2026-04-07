@@ -269,9 +269,9 @@ export default function AuditCapture() {
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          <button onClick={handleSaveDraft} disabled={saveResponses.isPending}
+          <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-            {saveResponses.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Save Draft
           </button>
         </div>
