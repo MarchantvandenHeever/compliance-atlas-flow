@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
@@ -40,10 +40,14 @@ export default function AuditCapture() {
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
   const submitAudit = useSubmitAudit();
+  const reopenAudit = useReopenAudit();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
+  const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
   const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
+  const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
+  const lastRevisedAt = (currentAuditInstance as any)?.last_revised_at;
 
   const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
@@ -225,6 +229,13 @@ export default function AuditCapture() {
     await submitAudit.mutateAsync(id);
   };
 
+  const handleReopenAudit = async () => {
+    if (!auditId) return;
+    const reason = prompt('Reason for revision (optional):');
+    if (reason === null) return; // cancelled
+    await reopenAudit.mutateAsync({ auditId, reason: reason || undefined });
+  };
+
   const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
 
   return (
@@ -297,20 +308,47 @@ export default function AuditCapture() {
       </div>
 
       {isLocked && (
-        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
-          <Lock size={14} />
-          <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
+          <div className="flex items-center gap-2">
+            <Lock size={14} />
+            <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+            {revisionCount > 0 && <span className="text-xs opacity-75">• Revision {revisionCount}{lastRevisedAt ? ` (${new Date(lastRevisedAt).toLocaleDateString()})` : ''}</span>}
+          </div>
+          <button onClick={handleReopenAudit} disabled={reopenAudit.isPending}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50 transition-colors">
+            {reopenAudit.isPending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+            Reopen for Revision
+          </button>
         </div>
       )}
 
-      {/* Header */}
+      {/* Revision Log */}
+      {revisionLog && revisionLog.length > 0 && (
+        <details className="bg-card border rounded-lg overflow-hidden">
+          <summary className="flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:bg-muted/30 text-sm font-medium">
+            <History size={14} className="text-muted-foreground" />
+            Revision History ({revisionLog.length})
+          </summary>
+          <div className="border-t divide-y">
+            {revisionLog.map(log => (
+              <div key={log.id} className="px-4 py-2 text-xs flex items-center gap-4">
+                <span className="font-medium text-foreground">Rev {log.revision_number}</span>
+                <span className="text-muted-foreground">{new Date(log.revised_at).toLocaleString()}</span>
+                <span className="text-muted-foreground">from <span className="font-medium">{log.previous_status}</span></span>
+                {log.reason && <span className="text-muted-foreground italic">— {log.reason}</span>}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold font-display">
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}` : auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
+            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}${revisionCount > 0 ? ` • Rev ${revisionCount}` : ''}` : auditId ? `Audit in progress${revisionCount > 0 ? ` (Revision ${revisionCount})` : ''}` : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -333,7 +371,7 @@ export default function AuditCapture() {
           )}
           {isLocked && (
             <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium">
-              <Lock size={14} /> Submitted
+              <Lock size={14} /> Locked
             </span>
           )}
         </div>
