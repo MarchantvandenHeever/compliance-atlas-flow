@@ -56,7 +56,7 @@ export default function Templates() {
       type ObjItem = { name: string; source: 'EA' | 'EMPr'; tasks: TaskItem[] };
       type PhaseItem = { name: string; source: 'EA' | 'EMPr'; objectives: ObjItem[] };
       const phasesMap = new Map<string, PhaseItem>();
-      const skipSheetPattern = /contents|summary|cover|index|^toc$/i;
+      const skipSheetPattern = /contents|summary|cover|index|^toc$|all\s*conditions/i;
 
       for (const sheetName of wb.SheetNames) {
         if (skipSheetPattern.test(sheetName)) continue;
