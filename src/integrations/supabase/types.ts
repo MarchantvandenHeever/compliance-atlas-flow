@@ -378,6 +378,42 @@ export type Database = {
           },
         ]
       }
+      project_templates: {
+        Row: {
+          created_at: string
+          id: string
+          project_id: string
+          template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          project_id: string
+          template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          project_id?: string
+          template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_templates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_templates_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           audit_frequency: string | null
