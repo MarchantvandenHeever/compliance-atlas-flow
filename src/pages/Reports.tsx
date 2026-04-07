@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, Plus, Calendar, User, Eye } from 'lucide-react';
+import { FileText, Download, Plus, Calendar, User, Eye, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const reports = [
   { id: 'r-5', title: 'Construction Audit Report 5', period: 'Mar 2026', status: 'Draft', author: 'Brain Green', reviewer: 'Charl Kruger', date: '01 Apr 2026', compliance: 100 },
@@ -10,6 +13,102 @@ const reports = [
 ];
 
 export default function Reports() {
+  const [generating, setGenerating] = useState<string | null>(null);
+
+  const generatePDF = async (report: typeof reports[0]) => {
+    setGenerating(report.id);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const url = `https://${projectId}.supabase.co/functions/v1/generate-report`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          reportTitle: report.title,
+          reportNumber: report.id.replace('r-', 'Report '),
+          period: report.period,
+          author: report.author,
+          reviewer: report.reviewer,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to generate report');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `CES_Audit_${report.period.replace(/\s/g, '_')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+      toast.success('Report downloaded successfully');
+    } catch (err: any) {
+      console.error('PDF generation error:', err);
+      toast.error(err.message || 'Failed to generate report');
+    } finally {
+      setGenerating(null);
+    }
+  };
+
+  const generateMonthlyReport = async () => {
+    setGenerating('new');
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const url = `https://${projectId}.supabase.co/functions/v1/generate-report`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          reportTitle: 'Monthly Environmental Audit Report',
+          reportNumber: 'Report ' + (reports.length + 1),
+          period: new Date().toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' }),
+          author: 'ECO Auditor',
+          reviewer: 'Reviewer',
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to generate');
+
+      const blob = await response.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = `CES_Monthly_Report_${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(downloadUrl);
+
+      toast.success('Monthly report generated');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to generate report');
+    } finally {
+      setGenerating(null);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
@@ -17,8 +116,13 @@ export default function Reports() {
           <h2 className="text-2xl font-bold font-display">Reports</h2>
           <p className="text-sm text-muted-foreground">Generate and manage audit reports</p>
         </div>
-        <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors">
-          <Plus size={14} /> Generate Report
+        <button
+          onClick={generateMonthlyReport}
+          disabled={generating === 'new'}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+        >
+          {generating === 'new' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+          Generate Report
         </button>
       </div>
 
@@ -27,7 +131,7 @@ export default function Reports() {
         <div className="bg-card border rounded-lg p-4">
           <h4 className="text-sm font-semibold mb-1">Monthly Audit Report</h4>
           <p className="text-xs text-muted-foreground mb-3">Full compliance report with appendices, charts, and photo evidence.</p>
-          <button className="text-xs text-primary font-medium hover:underline">Generate PDF →</button>
+          <button onClick={generateMonthlyReport} className="text-xs text-primary font-medium hover:underline">Generate PDF →</button>
         </div>
         <div className="bg-card border rounded-lg p-4">
           <h4 className="text-sm font-semibold mb-1">Weekly NC Summary</h4>
@@ -47,7 +151,7 @@ export default function Reports() {
           <h3 className="text-sm font-semibold">Report History</h3>
         </div>
         <div className="divide-y">
-          {reports.map((report, i) => (
+          {reports.map((report) => (
             <div key={report.id} className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/20 transition-colors">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                 <FileText size={18} />
@@ -69,8 +173,13 @@ export default function Reports() {
                 <button className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Preview">
                   <Eye size={14} />
                 </button>
-                <button className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Download PDF">
-                  <Download size={14} />
+                <button
+                  onClick={() => generatePDF(report)}
+                  disabled={generating === report.id}
+                  className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  title="Download PDF"
+                >
+                  {generating === report.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
                 </button>
               </div>
             </div>
