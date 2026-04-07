@@ -1,8 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
+import { useSubmitForReview, useReviewComments, useResolveReviewComment } from '@/hooks/useReviewData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
@@ -39,13 +40,16 @@ export default function AuditCapture() {
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
-  const submitAudit = useSubmitAudit();
+  const submitForReview = useSubmitForReview();
+  const { data: reviewComments } = useReviewComments(auditId || undefined);
+  const resolveComment = useResolveReviewComment();
   const reopenAudit = useReopenAudit();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
   const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
-  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
+  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved' || currentAuditInstance?.status === 'under_review';
+  const isAmendmentsRequested = currentAuditInstance?.status === 'amendments_requested' as any;
   const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
   const lastRevisedAt = (currentAuditInstance as any)?.last_revised_at;
 
@@ -221,12 +225,11 @@ export default function AuditCapture() {
 
   const handleSubmitAudit = async () => {
     if (!auditId && !projectId) return;
-    // Save first, then submit
     await handleSaveDraft();
     const id = auditId || searchParams.get('auditId');
     if (!id) return;
-    if (!confirm('Are you sure you want to submit this audit? It will be locked for further editing.')) return;
-    await submitAudit.mutateAsync(id);
+    if (!confirm('Submit this audit for review? A reviewer will be notified.')) return;
+    await submitForReview.mutateAsync(id);
   };
 
   const handleReopenAudit = async () => {
