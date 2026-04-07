@@ -754,7 +754,7 @@ Deno.serve(async (req) => {
         headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE, cellPadding: 2 },
         alternateRowStyles: { fillColor: [245, 250, 250] },
-        columnStyles: { 0: { cellWidth: 15 }, 1: { cellWidth: 55 }, 2: { cellWidth: 15 }, 3: { cellWidth: 40 }, 4: { cellWidth: 35 } },
+        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 15 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
