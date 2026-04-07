@@ -39,8 +39,11 @@ export default function AuditCapture() {
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
+  const submitAudit = useSubmitAudit();
+  const { data: auditInstances } = useAuditInstances(projectId || undefined);
 
-  const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
+  const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
+  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
 
   const items = useMemo(() => {
     if (dbItems?.length) return dbItems.map(i => ({
