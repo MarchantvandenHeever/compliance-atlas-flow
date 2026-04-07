@@ -35,7 +35,11 @@ export default function AuditCapture() {
   const objectiveIds = dbObjectives?.map(o => o.id);
   const { data: dbItems } = useTemplateItems(objectiveIds);
   const { data: dbResponses } = useAuditResponses(auditId || undefined);
+  const { data: dbSectionOverrides } = useAuditSectionOverrides(auditId || undefined);
   const saveResponses = useSaveAuditResponses();
+  const saveSectionOverrides = useSaveAuditSectionOverrides();
+
+  const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
   const items = useMemo(() => {
     if (dbItems?.length) return dbItems.map(i => ({
