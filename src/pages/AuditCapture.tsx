@@ -40,10 +40,14 @@ export default function AuditCapture() {
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
   const submitAudit = useSubmitAudit();
+  const reopenAudit = useReopenAudit();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
+  const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
   const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
+  const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
+  const lastRevisedAt = (currentAuditInstance as any)?.last_revised_at;
 
   const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
