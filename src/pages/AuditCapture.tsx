@@ -167,11 +167,34 @@ export default function AuditCapture() {
   const completionPct = activeItemCount > 0 ? Math.round(((metrics.compliantCount + metrics.nonCompliantCount + metrics.notedCount) / metrics.totalItems) * 100) : 0;
 
   const handleSaveDraft = async () => {
-    if (!auditId) {
-      const { toast } = await import('sonner');
-      toast.info('Create an audit from the Projects page to save to database.');
-      return;
+    let currentAuditId = auditId;
+
+    // Auto-create audit if none exists yet
+    if (!currentAuditId) {
+      if (!projectId || !templateId) {
+        const { toast } = await import('sonner');
+        toast.info('Select a project and template first.');
+        return;
+      }
+      try {
+        const now = new Date();
+        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const newAudit = await createAudit.mutateAsync({
+          project_id: projectId,
+          template_id: templateId,
+          period,
+          type: 'monthly',
+        });
+        currentAuditId = newAudit.id;
+        // Update URL with new auditId so subsequent saves use it
+        const params = new URLSearchParams(searchParams);
+        params.set('auditId', currentAuditId);
+        navigate(`/audit?${params.toString()}`, { replace: true });
+      } catch {
+        return; // error toast already shown by useCreateAudit
+      }
     }
+
     const responsesToSave = Object.entries(responses)
       .filter(([_, r]) => r.status)
       .map(([checklistItemId, r]) => ({
@@ -180,11 +203,10 @@ export default function AuditCapture() {
         comments: r.comments || '', actions: r.actions || '',
       }));
 
-    // Save section overrides alongside responses
     const overrides = sections.map(s => ({ section_id: s.id, is_active: !inactiveSections.has(s.id) }));
     await Promise.all([
-      saveResponses.mutateAsync({ auditId, responses: responsesToSave }),
-      saveSectionOverrides.mutateAsync({ auditId, overrides }),
+      saveResponses.mutateAsync({ auditId: currentAuditId, responses: responsesToSave }),
+      saveSectionOverrides.mutateAsync({ auditId: currentAuditId, overrides }),
     ]);
   };
 
