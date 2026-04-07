@@ -358,17 +358,31 @@ export default function AuditCapture() {
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          {!isLocked && (
+          {!isLocked && !isAmendmentsRequested && (
             <>
               <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
                 {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 Save Draft
               </button>
-              <button onClick={handleSubmitAudit} disabled={submitAudit.isPending || saveResponses.isPending || completionPct === 0}
+              <button onClick={handleSubmitAudit} disabled={submitForReview.isPending || saveResponses.isPending || completionPct === 0}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
-                {submitAudit.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                Submit Audit
+                {submitForReview.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Submit for Review
+              </button>
+            </>
+          )}
+          {isAmendmentsRequested && (
+            <>
+              <button onClick={handleSaveDraft} disabled={saveResponses.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                {saveResponses.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Changes
+              </button>
+              <button onClick={handleSubmitAudit} disabled={submitForReview.isPending || saveResponses.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {submitForReview.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Resubmit for Review
               </button>
             </>
           )}
