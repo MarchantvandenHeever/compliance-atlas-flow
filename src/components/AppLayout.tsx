@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import cesLogo from '@/assets/ces-logo.png';
+import NotificationBell from '@/components/NotificationBell';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -17,6 +18,7 @@ const navItems = [
   { to: '/templates', icon: Settings, label: 'Templates' },
   { to: '/users', icon: Shield, label: 'Users' },
   { to: '/onboarding', icon: UserPlus, label: 'Client Onboarding', adminOnly: true },
+  { to: '/reviews', icon: Eye, label: 'Audit Reviews', reviewerOnly: true },
 ] as const;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -72,7 +74,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
           {navItems
-            .filter(item => !('adminOnly' in item && item.adminOnly) || roles.includes('admin'))
+            .filter(item => {
+              if ('adminOnly' in item && item.adminOnly) return roles.includes('admin');
+              if ('reviewerOnly' in item && item.reviewerOnly) return roles.includes('reviewer') || roles.includes('admin');
+              return true;
+            })
             .map((item) => (
             <NavLink
               key={item.to}
@@ -128,8 +134,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {navItems.find(n => n.to === location.pathname)?.label || 'ECO Monitor'}
             </h1>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="hidden sm:inline">Zonnebloem 132kV Project</span>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <NotificationBell />
             <span className="w-2 h-2 rounded-full bg-success" />
             <span className="hidden sm:inline">Active</span>
           </div>
