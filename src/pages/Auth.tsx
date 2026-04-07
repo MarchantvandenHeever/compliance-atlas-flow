@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import cesLogo from '@/assets/ces-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -50,9 +51,7 @@ export default function Auth() {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">CES</span>
-            </div>
+            <img src={cesLogo} alt="CES Environmental" className="h-16 w-auto" />
           </div>
           <h1 className="text-2xl font-bold text-accent-foreground font-display">ECO Monitor</h1>
           <p className="text-sm text-accent-foreground/60 mt-1">Environmental Compliance Monitoring Platform</p>
