@@ -402,7 +402,7 @@ Deno.serve(async (req) => {
         const section = item ? sections.find((s: any) => s.id === item.section_id) : null;
         return [
           item?.condition_ref || "-",
-          (item?.description || "").substring(0, 80) + ((item?.description || "").length > 80 ? "..." : ""),
+          item?.description || "-",
           section?.name || "-",
           r.comments || "-",
           r.actions || "-",
@@ -639,7 +639,7 @@ Deno.serve(async (req) => {
           const currResp = responses.find((r: any) => r.checklist_item_id === itemId);
           changedItems.push([
             item?.condition_ref || "-",
-            (item?.description || "").substring(0, 70) + ((item?.description || "").length > 70 ? "..." : ""),
+            item?.description || "-",
             section?.name || "-",
             prev,
             curr,
@@ -736,7 +736,7 @@ Deno.serve(async (req) => {
         const statusColor = response?.status === "C" ? GREEN : response?.status === "NC" ? RED : GREY;
         checklistRows.push([
           item.condition_ref || "-",
-          (item.description || "").substring(0, 100),
+          item.description || "-",
           { content: statusText, styles: { textColor: statusColor, fontStyle: "bold", halign: "center" } },
           response?.comments || "-",
           response?.actions || "-",
