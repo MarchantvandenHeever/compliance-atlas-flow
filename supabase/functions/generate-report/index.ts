@@ -264,30 +264,38 @@ Deno.serve(async (req) => {
     doc.setFontSize(12); doc.setFont("helvetica", "normal");
     doc.text(reportNumber, margin + 10, 112);
 
+    // Review status badge
+    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
+    const reviewColor = auditData?.status === "approved" ? GREEN : AMBER;
+    doc.setFillColor(...(reviewColor as [number, number, number]));
+    doc.roundedRect(margin, 125, contentW, 8, 2, 2, "F");
+    doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+    doc.text(reviewStatus, pageW / 2, 130.5, { align: "center" });
+
     const projName = projectData?.name || "Project";
     const projClient = projectData?.client || "Client";
     const projLocation = projectData?.location || "Location";
 
     doc.setFillColor(30, 70, 90);
-    doc.rect(margin, 135, contentW, 60, "F");
-    doc.setFontSize(10); doc.setTextColor(...AQUA); doc.text("PROJECT", margin + 10, 148);
-    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text(projName, margin + 10, 157);
-    doc.setFontSize(9); doc.setTextColor(...AQUA); doc.text("CLIENT", margin + 10, 170);
-    doc.setTextColor(255, 255, 255); doc.text(projClient, margin + 10, 178);
-    doc.setTextColor(...AQUA); doc.text("LOCATION", margin + 10, 188);
-    doc.setTextColor(255, 255, 255); doc.text(projLocation, margin + 10, 195);
+    doc.rect(margin, 138, contentW, 60, "F");
+    doc.setFontSize(10); doc.setTextColor(...AQUA); doc.text("PROJECT", margin + 10, 151);
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text(projName, margin + 10, 160);
+    doc.setFontSize(9); doc.setTextColor(...AQUA); doc.text("CLIENT", margin + 10, 173);
+    doc.setTextColor(255, 255, 255); doc.text(projClient, margin + 10, 181);
+    doc.setTextColor(...AQUA); doc.text("LOCATION", margin + 10, 191);
+    doc.setTextColor(255, 255, 255); doc.text(projLocation, margin + 10, 198);
 
     doc.setFontSize(9); doc.setTextColor(...AQUA);
     const metaY = pageH - 60;
     doc.text("Audit Period", margin, metaY);
-    doc.text("Author", margin + 60, metaY);
-    doc.text("Reviewer", margin + 120, metaY);
-    doc.text("Issue Date", pageW - margin - 30, metaY);
+    doc.text("Author", margin + 45, metaY);
+    doc.text("Reviewer", margin + 90, metaY);
+    doc.text("Review Status", margin + 135, metaY);
     doc.setTextColor(255, 255, 255);
     doc.text(period, margin, metaY + 7);
-    doc.text(author, margin + 60, metaY + 7);
-    doc.text(reviewer, margin + 120, metaY + 7);
-    doc.text(new Date().toLocaleDateString("en-ZA"), pageW - margin - 30, metaY + 7);
+    doc.text(author, margin + 45, metaY + 7);
+    doc.text(reviewer, margin + 90, metaY + 7);
+    doc.text(reviewStatus, margin + 135, metaY + 7);
     doc.setFillColor(...TEAL);
     doc.rect(0, pageH - 8, pageW, 8, "F");
 
