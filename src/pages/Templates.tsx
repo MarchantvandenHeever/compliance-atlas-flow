@@ -95,7 +95,7 @@ export default function Templates() {
           const refVal = refCol >= 0 ? String(row[refCol] || '').trim() : '';
 
           // Update current phase/objective when a new value appears
-          if (rawPhase) currentPhaseName = rawPhase;
+          if (rawPhase && !/all\s*conditions/i.test(rawPhase)) currentPhaseName = rawPhase;
           if (rawObj) currentObjName = rawObj;
 
           // If no phase name yet, use the sheet name
