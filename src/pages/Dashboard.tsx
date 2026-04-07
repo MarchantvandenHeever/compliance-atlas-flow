@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Minus, TrendingUp, ClipboardCheck, Calendar, AlertTriangle, FileCheck, ArrowRight } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
@@ -6,14 +7,55 @@ import { sampleAuditData, defaultTemplate } from '@/data/checklistData';
 import { useAuditInstances } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 const COLORS = ['#0096A6', '#ef4444', '#9ca3af'];
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { data: projects } = useProjects();
   const { data: audits } = useAuditInstances();
 
-  // Use DB data summary or fallback to sample
+  // Fetch all responses for completed audits to calculate real metrics
+  const completedAuditIds = useMemo(() =>
+    (audits?.filter(a => a.status === 'submitted' || a.status === 'approved') || []).map(a => a.id),
+    [audits]
+  );
+
+  const { data: allResponses } = useQuery({
+    queryKey: ['dashboard-responses', completedAuditIds],
+    queryFn: async () => {
+      if (!completedAuditIds.length) return [];
+      const { data, error } = await supabase
+        .from('audit_item_responses')
+        .select('audit_id, status')
+        .in('audit_id', completedAuditIds);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && completedAuditIds.length > 0,
+  });
+
+  // Build per-audit metrics
+  const auditMetrics = useMemo(() => {
+    if (!allResponses || !audits) return [];
+    return audits
+      .filter(a => a.status === 'submitted' || a.status === 'approved')
+      .sort((a, b) => new Date(b.submitted_at || b.updated_at).getTime() - new Date(a.submitted_at || a.updated_at).getTime())
+      .map(audit => {
+        const responses = allResponses.filter(r => r.audit_id === audit.id);
+        const compliant = responses.filter(r => r.status === 'C').length;
+        const nonCompliant = responses.filter(r => r.status === 'NC').length;
+        const noted = responses.filter(r => r.status === 'NA').length;
+        const assessed = compliant + nonCompliant + noted;
+        const compliance = assessed > 0 ? Math.round((compliant / assessed) * 100) : 0;
+        const project = projects?.find(p => p.id === audit.project_id);
+        return { audit, project, compliant, nonCompliant, noted, assessed, compliance };
+      });
+  }, [allResponses, audits, projects]);
+
   const projectName = projects?.[0]?.name || sampleAuditData.project.name;
   const auditCount = audits?.length || 0;
   const draftCount = audits?.filter(a => a.status === 'draft').length || 0;
@@ -168,48 +210,61 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* Sample Audit History (fallback) */}
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-card rounded-lg border">
-        <div className="p-4 border-b"><h3 className="text-sm font-semibold">Sample Audit History</h3></div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Period</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Compliant</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Non-Compliant</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Noted</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Compliance %</th>
-                <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleAuditData.monthlyTrend.slice().reverse().map((row, i) => (
-                <tr key={row.month} className="border-b last:border-0 hover:bg-muted/20">
-                  <td className="px-4 py-3 font-medium">{row.month}</td>
-                  <td className="px-4 py-3 text-center"><span className="text-success font-medium">{row.compliant}</span></td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`font-medium ${row.nonCompliant > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{row.nonCompliant}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-muted-foreground">{row.noted}</td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
-                        <div className="h-full bg-primary rounded-full" style={{ width: `${row.compliance}%` }} />
-                      </div>
-                      <span className="text-xs font-medium">{row.compliance}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
-                      i === 0 ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
-                    }`}>{i === 0 ? 'Current' : 'Submitted'}</span>
-                  </td>
+      {/* Completed Audit Results */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="bg-card rounded-lg border">
+        <div className="p-4 border-b"><h3 className="text-sm font-semibold">Completed Audit Results</h3></div>
+        {auditMetrics.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Project</th>
+                  <th className="text-left px-4 py-2.5 text-xs font-medium text-muted-foreground">Period</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Compliant</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Non-Compliant</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">N/A</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Compliance %</th>
+                  <th className="text-center px-4 py-2.5 text-xs font-medium text-muted-foreground">Status</th>
+                  <th className="px-4 py-2.5"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {auditMetrics.map(({ audit, project, compliant, nonCompliant, noted, compliance }) => (
+                  <tr key={audit.id} className="border-b last:border-0 hover:bg-muted/20">
+                    <td className="px-4 py-3 font-medium">{project?.name || '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{audit.period}</td>
+                    <td className="px-4 py-3 text-center"><span className="text-success font-medium">{compliant}</span></td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`font-medium ${nonCompliant > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>{nonCompliant}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-muted-foreground">{noted}</td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary rounded-full" style={{ width: `${compliance}%` }} />
+                        </div>
+                        <span className="text-xs font-medium">{compliance}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                        audit.status === 'submitted' ? 'bg-green-100 text-green-700' : 'bg-primary/10 text-primary'
+                      }`}>{audit.status}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
+                        className="text-xs text-primary hover:underline">View</Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-8 text-center text-sm text-muted-foreground">
+            No completed audits yet. Submit an audit to see results here.
+          </div>
+        )}
       </motion.div>
     </div>
   );
