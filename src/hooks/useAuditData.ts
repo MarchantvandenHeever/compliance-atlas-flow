@@ -106,6 +106,24 @@ export function useSaveAuditSectionOverrides() {
   });
 }
 
+export function useSubmitAudit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (auditId: string) => {
+      const { error } = await supabase
+        .from('audit_instances')
+        .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+        .eq('id', auditId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['audit-instances'] });
+      toast.success('Audit submitted successfully');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useSaveAuditResponses() {
   const qc = useQueryClient();
   const { user } = useAuth();
