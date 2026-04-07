@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Save, Search, Loader2 } from 'lucide-react';
-import { useTemplateSections, useTemplateItems } from '@/hooks/useTemplates';
+import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
 import { useAuditResponses, useSaveAuditResponses } from '@/hooks/useAuditData';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
 import { ComplianceStatus, AuditItemResponse } from '@/types';
@@ -20,14 +20,23 @@ export default function AuditCapture() {
   const auditId = searchParams.get('auditId');
   const templateId = searchParams.get('templateId');
 
-  // Try to load from DB if we have a templateId, otherwise use local data
   const { data: dbSections } = useTemplateSections(templateId || undefined);
   const sectionIds = dbSections?.map(s => s.id);
-  const { data: dbItems } = useTemplateItems(sectionIds);
+  const { data: dbObjectives } = useTemplateObjectives(sectionIds);
+  const objectiveIds = dbObjectives?.map(o => o.id);
+  const { data: dbItems } = useTemplateItems(objectiveIds);
   const { data: dbResponses } = useAuditResponses(auditId || undefined);
   const saveResponses = useSaveAuditResponses();
 
-  // Use DB data if available, otherwise fallback to local
+  // Build flat items list for compliance calculation
+  const items = useMemo(() => {
+    if (dbItems?.length) return dbItems.map(i => ({
+      id: i.id, objectiveId: i.objective_id, conditionRef: i.condition_ref || '', description: i.description,
+      source: i.source as 'EA' | 'EMPr', order: i.sort_order,
+    }));
+    return defaultTemplate.items;
+  }, [dbItems]);
+
   const sections = useMemo(() => {
     if (dbSections?.length) return dbSections.map(s => ({
       id: s.id, name: s.name, source: s.source as 'EA' | 'EMPr', order: s.sort_order,
@@ -35,18 +44,15 @@ export default function AuditCapture() {
     return defaultTemplate.sections;
   }, [dbSections]);
 
-  const items = useMemo(() => {
-    if (dbItems?.length) return dbItems.map(i => ({
-      id: i.id, sectionId: i.section_id, conditionRef: i.condition_ref || '', description: i.description,
-      source: i.source as 'EA' | 'EMPr', order: i.sort_order,
+  const objectives = useMemo(() => {
+    if (dbObjectives?.length) return dbObjectives.map(o => ({
+      id: o.id, sectionId: o.section_id, name: o.name, source: o.source as 'EA' | 'EMPr', order: o.sort_order,
     }));
-    return defaultTemplate.items;
-  }, [dbItems]);
+    return [];
+  }, [dbObjectives]);
 
-  // Initialize responses from DB
   const [responses, setResponses] = useState<Record<string, Partial<AuditItemResponse>>>({});
 
-  // Merge DB responses into local state once loaded
   useMemo(() => {
     if (dbResponses?.length) {
       const mapped: Record<string, Partial<AuditItemResponse>> = {};
@@ -67,32 +73,29 @@ export default function AuditCapture() {
   }, [dbResponses]);
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<ComplianceStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sourceFilter, setSourceFilter] = useState<'all' | 'EA' | 'EMPr'>('all');
 
-  // Auto-expand all sections on mount
   useMemo(() => {
     if (sections.length && expandedSections.size === 0) {
       setExpandedSections(new Set(sections.map(s => s.id)));
+      if (objectives.length) {
+        setExpandedObjectives(new Set(objectives.map(o => o.id)));
+      }
     }
-  }, [sections]);
+  }, [sections, objectives]);
 
-  const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      next.has(sectionId) ? next.delete(sectionId) : next.add(sectionId);
-      return next;
-    });
+  const toggleSection = useCallback((id: string) => {
+    setExpandedSections(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }, []);
-
+  const toggleObjective = useCallback((id: string) => {
+    setExpandedObjectives(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }, []);
   const toggleRow = useCallback((itemId: string) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      next.has(itemId) ? next.delete(itemId) : next.add(itemId);
-      return next;
-    });
+    setExpandedRows(prev => { const n = new Set(prev); n.has(itemId) ? n.delete(itemId) : n.add(itemId); return n; });
   }, []);
 
   const setStatus = useCallback((itemId: string, status: ComplianceStatus) => {
@@ -114,24 +117,20 @@ export default function AuditCapture() {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], photos } }));
   }, []);
 
-  const filteredSections = useMemo(() => {
-    return sections
-      .filter(s => sourceFilter === 'all' || s.source === sourceFilter)
-      .map(section => ({
-        ...section,
-        items: items.filter(item => {
-          if (item.sectionId !== section.id) return false;
-          if (searchQuery && !item.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-          if (statusFilter !== 'all') {
-            const response = responses[item.id];
-            if (statusFilter === null && response?.status) return false;
-            if (statusFilter && response?.status !== statusFilter) return false;
-          }
-          return true;
-        })
-      }))
-      .filter(s => s.items.length > 0);
-  }, [sections, items, sourceFilter, searchQuery, statusFilter, responses]);
+  // Filter items based on search, source, status
+  const getFilteredItems = useCallback((objectiveId: string) => {
+    return items.filter(item => {
+      if ('objectiveId' in item && item.objectiveId !== objectiveId) return false;
+      if ('sectionId' in item && item.sectionId !== objectiveId) return false;
+      if (searchQuery && !item.description.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (statusFilter !== 'all') {
+        const response = responses[item.id];
+        if (statusFilter === null && response?.status) return false;
+        if (statusFilter && response?.status !== statusFilter) return false;
+      }
+      return true;
+    });
+  }, [items, searchQuery, statusFilter, responses]);
 
   const allResponses = useMemo(() => {
     return Object.values(responses).filter(r => r.status) as AuditItemResponse[];
@@ -142,7 +141,6 @@ export default function AuditCapture() {
 
   const handleSaveDraft = async () => {
     if (!auditId) {
-      // Save locally - show toast
       const { toast } = await import('sonner');
       toast.info('Create an audit from the Projects page to save to database. Local state preserved.');
       return;
@@ -157,6 +155,9 @@ export default function AuditCapture() {
       }));
     await saveResponses.mutateAsync({ auditId, responses: responsesToSave });
   };
+
+  // Determine if we have the 3-level structure
+  const has3Level = objectives.length > 0;
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
@@ -235,102 +236,134 @@ export default function AuditCapture() {
         </select>
       </div>
 
-      {/* Checklist */}
+      {/* Checklist — 3-level or 2-level */}
       <div className="space-y-2">
-        {filteredSections.map(section => {
-          const isExpanded = expandedSections.has(section.id);
-          const sectionResponses = section.items.map(i => responses[i.id]).filter(r => r?.status);
-          const sectionComplete = sectionResponses.length;
-          const sectionTotal = section.items.length;
+        {sections
+          .filter(s => sourceFilter === 'all' || s.source === sourceFilter)
+          .map(section => {
+            const isExpanded = expandedSections.has(section.id);
+            const sectionObjectives = has3Level
+              ? objectives.filter(o => o.sectionId === section.id)
+              : [{ id: section.id, name: section.name, sectionId: section.id, source: section.source, order: 0 }];
 
-          return (
-            <div key={section.id} className="bg-card border rounded-lg overflow-hidden">
-              <button onClick={() => toggleSection(section.id)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
-                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>
-                  {section.source}
-                </span>
-                <span className="text-sm font-medium flex-1">{section.name}</span>
-                <span className="text-xs text-muted-foreground">{sectionComplete}/{sectionTotal}</span>
-                <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${(sectionComplete / sectionTotal) * 100}%` }} />
-                </div>
-              </button>
+            const sectionItemCount = sectionObjectives.reduce((acc, obj) => acc + getFilteredItems(obj.id).length, 0);
+            if (sectionItemCount === 0 && (searchQuery || statusFilter !== 'all')) return null;
 
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
-                    <div className="border-t divide-y">
-                      {section.items.map(item => {
-                        const response = responses[item.id];
-                        const isRowExpanded = expandedRows.has(item.id);
+            const sectionResponded = sectionObjectives.reduce((acc, obj) => {
+              return acc + getFilteredItems(obj.id).filter(i => responses[i.id]?.status).length;
+            }, 0);
 
-                        return (
-                          <div key={item.id} className="group">
-                            <div className="flex items-start gap-2 px-4 py-3 hover:bg-muted/20">
-                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getStatusDotClass(response?.status as ComplianceStatus || null)}`} />
-                              <span className="text-xs text-muted-foreground w-10 flex-shrink-0 pt-0.5">{item.conditionRef}</span>
-                              <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
-                                <span className={`${isRowExpanded ? '' : 'line-clamp-2'}`}>{item.description}</span>
-                              </button>
-                              <div className="flex gap-1 flex-shrink-0">
-                                {STATUS_OPTIONS.map(opt => (
-                                  <button key={opt.value} onClick={() => setStatus(item.id, opt.value)}
-                                    className={`px-2 py-1 rounded text-xs font-medium transition-all ${
-                                      response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'
-                                    }`} title={opt.label}>
-                                    {opt.shortLabel}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+            return (
+              <div key={section.id} className="bg-card border rounded-lg overflow-hidden">
+                <button onClick={() => toggleSection(section.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
+                  {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>
+                    {section.source}
+                  </span>
+                  <span className="text-sm font-semibold flex-1">{section.name}</span>
+                  <span className="text-xs text-muted-foreground">{sectionResponded}/{sectionItemCount}</span>
+                  <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${sectionItemCount ? (sectionResponded / sectionItemCount) * 100 : 0}%` }} />
+                  </div>
+                </button>
 
-                            <AnimatePresence>
-                              {isRowExpanded && (
-                                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                                  <div className="px-4 pb-3 pl-16 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <div>
-                                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Audit Evidence / Comments</label>
-                                      <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)}
-                                        placeholder="Enter audit observations..." rows={3}
-                                        className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-                                    </div>
-                                    <div>
-                                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Actions / Recommendations</label>
-                                      <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)}
-                                        placeholder="Enter corrective actions..." rows={3}
-                                        className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
-                                      <PhotoUpload
-                                        responseId={response?.id || item.id}
-                                        photos={response?.photos?.map(p => ({
-                                          url: p.url, caption: p.caption, gpsLocation: p.gpsLocation,
-                                          exifDate: p.timestamp, storagePath: '',
-                                        })) || []}
-                                        onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({
-                                          id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '',
-                                          gpsLocation: p.gpsLocation,
-                                        })))}
-                                        disabled={false}
-                                      />
-                                    </div>
-                                  </div>
-                                </motion.div>
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+                      <div className="border-t">
+                        {sectionObjectives.map(obj => {
+                          const objItems = getFilteredItems(obj.id);
+                          if (objItems.length === 0) return null;
+                          const isObjExpanded = has3Level ? expandedObjectives.has(obj.id) : true;
+
+                          return (
+                            <div key={obj.id}>
+                              {has3Level && (
+                                <button onClick={() => toggleObjective(obj.id)}
+                                  className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-muted/10 transition-colors text-left border-b bg-muted/5">
+                                  {isObjExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                  <span className="text-sm font-medium flex-1 text-foreground/80">{obj.name}</span>
+                                  <span className="text-xs text-muted-foreground">{objItems.length} tasks</span>
+                                </button>
                               )}
-                            </AnimatePresence>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          );
-        })}
+
+                              {isObjExpanded && (
+                                <div className="divide-y">
+                                  {objItems.map(item => {
+                                    const response = responses[item.id];
+                                    const isRowExpanded = expandedRows.has(item.id);
+
+                                    return (
+                                      <div key={item.id} className="group">
+                                        <div className="flex items-start gap-2 px-4 py-3 hover:bg-muted/20">
+                                          <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getStatusDotClass(response?.status as ComplianceStatus || null)}`} />
+                                          <span className="text-xs text-muted-foreground w-10 flex-shrink-0 pt-0.5">{item.conditionRef}</span>
+                                          <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
+                                            <span className={`${isRowExpanded ? '' : 'line-clamp-2'}`}>{item.description}</span>
+                                          </button>
+                                          <div className="flex gap-1 flex-shrink-0">
+                                            {STATUS_OPTIONS.map(opt => (
+                                              <button key={opt.value} onClick={() => setStatus(item.id, opt.value)}
+                                                className={`px-2 py-1 rounded text-xs font-medium transition-all ${
+                                                  response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                                                }`} title={opt.label}>
+                                                {opt.shortLabel}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        <AnimatePresence>
+                                          {isRowExpanded && (
+                                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                                              <div className="px-4 pb-3 pl-16 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Audit Evidence / Comments</label>
+                                                  <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)}
+                                                    placeholder="Enter audit observations..." rows={3}
+                                                    className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                </div>
+                                                <div>
+                                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Actions / Recommendations</label>
+                                                  <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)}
+                                                    placeholder="Enter corrective actions..." rows={3}
+                                                    className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                  <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
+                                                  <PhotoUpload
+                                                    responseId={response?.id || item.id}
+                                                    photos={response?.photos?.map(p => ({
+                                                      url: p.url, caption: p.caption, gpsLocation: p.gpsLocation,
+                                                      exifDate: p.timestamp, storagePath: '',
+                                                    })) || []}
+                                                    onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({
+                                                      id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '',
+                                                      gpsLocation: p.gpsLocation,
+                                                    })))}
+                                                    disabled={false}
+                                                  />
+                                                </div>
+                                              </div>
+                                            </motion.div>
+                                          )}
+                                        </AnimatePresence>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
       </div>
     </div>
   );
