@@ -157,10 +157,18 @@ Deno.serve(async (req) => {
       projectData = project;
     }
 
-    // Calculate compliance metrics
-    const compliantCount = responses.filter((r: any) => r.status === "C").length;
-    const ncCount = responses.filter((r: any) => r.status === "NC").length;
-    const naCount = responses.filter((r: any) => r.status === "NA").length;
+    // Determine active vs inactive items
+    const activeSections = sections.filter((s: any) => !s._inactive);
+    const inactiveSections = sections.filter((s: any) => s._inactive);
+    const activeSectionIds = new Set(activeSections.map((s: any) => s.id));
+    const activeItems = items.filter((i: any) => activeSectionIds.has(i.section_id));
+    const activeItemIds = new Set(activeItems.map((i: any) => i.id));
+
+    // Calculate compliance metrics (only active sections)
+    const activeResponses = responses.filter((r: any) => activeItemIds.has(r.checklist_item_id));
+    const compliantCount = activeResponses.filter((r: any) => r.status === "C").length;
+    const ncCount = activeResponses.filter((r: any) => r.status === "NC").length;
+    const naCount = activeResponses.filter((r: any) => r.status === "NA").length;
     const totalAssessed = compliantCount + ncCount;
     const compliancePercent = totalAssessed > 0
       ? Math.round((compliantCount / totalAssessed) * 100)
