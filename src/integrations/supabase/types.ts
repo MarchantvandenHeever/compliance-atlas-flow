@@ -19,8 +19,10 @@ export type Database = {
           auditor_id: string | null
           created_at: string
           id: string
+          last_revised_at: string | null
           period: string
           project_id: string
+          revision_count: number
           status: Database["public"]["Enums"]["audit_status"]
           submitted_at: string | null
           template_id: string
@@ -31,8 +33,10 @@ export type Database = {
           auditor_id?: string | null
           created_at?: string
           id?: string
+          last_revised_at?: string | null
           period: string
           project_id: string
+          revision_count?: number
           status?: Database["public"]["Enums"]["audit_status"]
           submitted_at?: string | null
           template_id: string
@@ -43,8 +47,10 @@ export type Database = {
           auditor_id?: string | null
           created_at?: string
           id?: string
+          last_revised_at?: string | null
           period?: string
           project_id?: string
+          revision_count?: number
           status?: Database["public"]["Enums"]["audit_status"]
           submitted_at?: string | null
           template_id?: string
@@ -115,6 +121,44 @@ export type Database = {
             columns: ["checklist_item_id"]
             isOneToOne: false
             referencedRelation: "checklist_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_revision_log: {
+        Row: {
+          audit_id: string
+          id: string
+          previous_status: string
+          reason: string | null
+          revised_at: string
+          revised_by: string
+          revision_number: number
+        }
+        Insert: {
+          audit_id: string
+          id?: string
+          previous_status: string
+          reason?: string | null
+          revised_at?: string
+          revised_by: string
+          revision_number: number
+        }
+        Update: {
+          audit_id?: string
+          id?: string
+          previous_status?: string
+          reason?: string | null
+          revised_at?: string
+          revised_by?: string
+          revision_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_revision_log_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_instances"
             referencedColumns: ["id"]
           },
         ]
