@@ -41,6 +41,7 @@ const App = () => (
                       <Route path="/analytics" element={<Analytics />} />
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/templates" element={<Templates />} />
+                      <Route path="/users" element={<Users />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

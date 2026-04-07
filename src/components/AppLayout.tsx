@@ -15,6 +15,7 @@ const navItems = [
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/templates', icon: Settings, label: 'Templates' },
+  { to: '/users', icon: Shield, label: 'Users' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
