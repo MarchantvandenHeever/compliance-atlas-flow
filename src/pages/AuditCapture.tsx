@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useSubmitAudit, useAuditInstances } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
@@ -39,6 +39,11 @@ export default function AuditCapture() {
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
   const createAudit = useCreateAudit();
+  const submitAudit = useSubmitAudit();
+  const { data: auditInstances } = useAuditInstances(projectId || undefined);
+
+  const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
+  const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved';
 
   const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
@@ -210,8 +215,16 @@ export default function AuditCapture() {
     ]);
   };
 
+  const handleSubmitAudit = async () => {
+    if (!auditId && !projectId) return;
+    // Save first, then submit
+    await handleSaveDraft();
+    const id = auditId || searchParams.get('auditId');
+    if (!id) return;
+    if (!confirm('Are you sure you want to submit this audit? It will be locked for further editing.')) return;
+    await submitAudit.mutateAsync(id);
+  };
 
-  // Project navigation helpers
   const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
 
   return (
@@ -255,6 +268,13 @@ export default function AuditCapture() {
         )}
       </div>
 
+      {isLocked && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 text-amber-800 text-sm">
+          <Lock size={14} />
+          <span className="font-medium">This audit has been submitted and is locked for editing.</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -262,18 +282,32 @@ export default function AuditCapture() {
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
+            {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}` : auditId ? 'Audit in progress' : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-            {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Save Draft
-          </button>
+          {!isLocked && (
+            <>
+              <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Save Draft
+              </button>
+              <button onClick={handleSubmitAudit} disabled={submitAudit.isPending || saveResponses.isPending || completionPct === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-green-600 text-white text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors">
+                {submitAudit.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Submit Audit
+              </button>
+            </>
+          )}
+          {isLocked && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium">
+              <Lock size={14} /> Submitted
+            </span>
+          )}
         </div>
       </div>
 
@@ -324,6 +358,7 @@ export default function AuditCapture() {
                 {isSectionInactive && <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-700">Inactive</span>}
                 <span className="text-xs text-muted-foreground">{sectionResponded}/{sectionItemCount}</span>
                 <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${sectionItemCount ? (sectionResponded / sectionItemCount) * 100 : 0}%` }} /></div>
+                {!isLocked && (
                 <button
                   onClick={(e) => { e.stopPropagation(); toggleSectionActive(section.id); }}
                   className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${isSectionInactive ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary' : 'bg-primary/10 text-primary hover:bg-muted hover:text-muted-foreground'}`}
@@ -331,6 +366,7 @@ export default function AuditCapture() {
                 >
                   {isSectionInactive ? 'Activate' : 'Deactivate'}
                 </button>
+                )}
               </div>
               <AnimatePresence>
                 {isExpanded && (
@@ -364,8 +400,8 @@ export default function AuditCapture() {
                                         </button>
                                         <div className="flex gap-1 flex-shrink-0">
                                           {STATUS_OPTIONS.map(opt => (
-                                            <button key={opt.value} onClick={() => setStatus(item.id, opt.value)}
-                                              className={`px-2 py-1 rounded text-xs font-medium transition-all ${response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'}`} title={opt.label}>
+                                            <button key={opt.value} onClick={() => !isLocked && setStatus(item.id, opt.value)} disabled={isLocked}
+                                              className={`px-2 py-1 rounded text-xs font-medium transition-all ${response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'} ${isLocked ? 'cursor-not-allowed' : ''}`} title={opt.label}>
                                               {opt.shortLabel}
                                             </button>
                                           ))}
@@ -377,20 +413,20 @@ export default function AuditCapture() {
                                             <div className="px-4 pb-3 pl-16 grid grid-cols-1 md:grid-cols-2 gap-3">
                                               <div>
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Audit Evidence / Comments</label>
-                                                <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)} placeholder="Enter audit observations..." rows={3}
-                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)} placeholder="Enter audit observations..." rows={3} disabled={isLocked}
+                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div>
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Actions / Recommendations</label>
-                                                <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)} placeholder="Enter corrective actions..." rows={3}
-                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none" />
+                                                <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)} placeholder="Enter corrective actions..." rows={3} disabled={isLocked}
+                                                  className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div className="md:col-span-2">
                                                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
                                                 <PhotoUpload responseId={response?.id || item.id}
                                                   photos={response?.photos?.map(p => ({ url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: '' })) || []}
                                                   onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation })))}
-                                                  disabled={false} />
+                                                  disabled={isLocked} />
                                               </div>
                                             </div>
                                           </motion.div>
