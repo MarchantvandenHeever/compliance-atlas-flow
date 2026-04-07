@@ -38,6 +38,7 @@ export default function AuditCapture() {
   const { data: dbSectionOverrides } = useAuditSectionOverrides(auditId || undefined);
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
+  const createAudit = useCreateAudit();
 
   const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
