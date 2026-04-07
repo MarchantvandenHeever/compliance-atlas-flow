@@ -29,6 +29,7 @@ export default function NewProjectDialog() {
     await createProject.mutateAsync({
       ...form,
       client: selectedOrg?.name || form.client,
+      organisation_id: selectedOrg?.id,
       template_id: form.template_id || undefined,
     });
     setOpen(false);

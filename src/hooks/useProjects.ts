@@ -32,11 +32,14 @@ export function useCreateProject() {
       description?: string;
       audit_frequency?: string;
       template_id?: string;
+      organisation_id?: string;
     }) => {
-      if (!profile?.organisation_id) throw new Error('No organisation found. Please contact your admin.');
+      const orgId = project.organisation_id || profile?.organisation_id;
+      if (!orgId) throw new Error('No organisation found. Please select a client or contact your admin.');
+      const { organisation_id: _, ...rest } = project;
       const { data, error } = await supabase
         .from('projects')
-        .insert({ ...project, organisation_id: profile.organisation_id })
+        .insert({ ...rest, organisation_id: orgId })
         .select()
         .single();
       if (error) throw error;
