@@ -125,7 +125,7 @@ export type Database = {
           description: string
           id: string
           is_active: boolean
-          section_id: string
+          objective_id: string
           sort_order: number
           source: Database["public"]["Enums"]["checklist_source"]
         }
@@ -134,7 +134,7 @@ export type Database = {
           description: string
           id?: string
           is_active?: boolean
-          section_id: string
+          objective_id: string
           sort_order?: number
           source: Database["public"]["Enums"]["checklist_source"]
         }
@@ -143,13 +143,45 @@ export type Database = {
           description?: string
           id?: string
           is_active?: boolean
+          objective_id?: string
+          sort_order?: number
+          source?: Database["public"]["Enums"]["checklist_source"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checklist_items_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "checklist_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      checklist_objectives: {
+        Row: {
+          id: string
+          name: string
+          section_id: string
+          sort_order: number
+          source: Database["public"]["Enums"]["checklist_source"]
+        }
+        Insert: {
+          id?: string
+          name: string
+          section_id: string
+          sort_order?: number
+          source: Database["public"]["Enums"]["checklist_source"]
+        }
+        Update: {
+          id?: string
+          name?: string
           section_id?: string
           sort_order?: number
           source?: Database["public"]["Enums"]["checklist_source"]
         }
         Relationships: [
           {
-            foreignKeyName: "checklist_items_section_id_fkey"
+            foreignKeyName: "checklist_objectives_section_id_fkey"
             columns: ["section_id"]
             isOneToOne: false
             referencedRelation: "checklist_sections"

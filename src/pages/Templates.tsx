@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { defaultTemplate } from '@/data/checklistData';
 import {
   FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight, Upload,
   Loader2, Trash2, Eye, MoreVertical,
 } from 'lucide-react';
-import { useTemplates, useTemplateSections, useTemplateItems, useImportChecklist, useDeleteTemplate } from '@/hooks/useTemplates';
+import { useTemplates, useTemplateSections, useTemplateObjectives, useTemplateItems, useImportChecklist, useDeleteTemplate } from '@/hooks/useTemplates';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
@@ -18,7 +17,8 @@ import {
 import { Button } from '@/components/ui/button';
 
 export default function Templates() {
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
+  const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const { data: dbTemplates, isLoading } = useTemplates();
@@ -26,31 +26,21 @@ export default function Templates() {
   const deleteTemplate = useDeleteTemplate();
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // View selected or first template
   const viewingTemplate = selectedTemplateId
     ? dbTemplates?.find(t => t.id === selectedTemplateId)
     : dbTemplates?.[0];
 
   const { data: dbSections } = useTemplateSections(viewingTemplate?.id);
   const sectionIds = dbSections?.map(s => s.id);
-  const { data: dbItems } = useTemplateItems(sectionIds);
+  const { data: dbObjectives } = useTemplateObjectives(sectionIds);
+  const objectiveIds = dbObjectives?.map(o => o.id);
+  const { data: dbItems } = useTemplateItems(objectiveIds);
 
-  const hasDbData = !!dbSections?.length;
-  const displaySections = hasDbData
-    ? dbSections!.map(s => ({ id: s.id, name: s.name, source: s.source as 'EA' | 'EMPr', order: s.sort_order }))
-    : !dbTemplates?.length ? defaultTemplate.sections : [];
-  const displayItems = hasDbData
-    ? dbItems?.map(i => ({ id: i.id, sectionId: i.section_id, conditionRef: i.condition_ref || '', description: i.description, source: i.source as 'EA' | 'EMPr', order: i.sort_order })) || []
-    : !dbTemplates?.length ? defaultTemplate.items : [];
-  const templateName = viewingTemplate?.name || (!dbTemplates?.length ? defaultTemplate.name : '');
-  const templateVersion = viewingTemplate?.version || (!dbTemplates?.length ? defaultTemplate.version : 1);
-
-  const toggleSection = (id: string) => {
-    setExpandedSections(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const togglePhase = (id: string) => {
+    setExpandedPhases(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleObjective = (id: string) => {
+    setExpandedObjectives(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,7 +51,8 @@ export default function Templates() {
       const data = await file.arrayBuffer();
       const wb = XLSX.read(data, { cellDates: true });
 
-      const sectionsMap = new Map<string, { name: string; source: 'EA' | 'EMPr'; items: Array<{ ref: string; desc: string; source: 'EA' | 'EMPr' }> }>();
+      // 3-level structure: Phase → Objective → Task
+      const phasesArr: Array<{ name: string; source: 'EA' | 'EMPr'; objectives: Array<{ name: string; source: 'EA' | 'EMPr'; tasks: Array<{ ref: string; desc: string; source: 'EA' | 'EMPr' }> }> }> = [];
       const skipSheetPattern = /contents|summary|cover|index|^toc$/i;
 
       for (const sheetName of wb.SheetNames) {
@@ -85,7 +76,10 @@ export default function Templates() {
 
         if (descCol < 0) continue;
 
-        let currentSection = sheetName;
+        // Each sheet = Phase
+        let currentPhase: typeof phasesArr[0] = { name: sheetName, source: sheetSource, objectives: [] };
+        let currentObjective: typeof currentPhase.objectives[0] | null = null;
+
         for (let i = headerIdx + 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row) continue;
@@ -94,37 +88,54 @@ export default function Templates() {
           const refVal = refCol >= 0 ? String(row[refCol] || '').trim() : '';
           const scoreVal = scoreCol >= 0 ? String(row[scoreCol] || '').trim() : '';
 
-          const isSectionHeader =
+          // Detect objective headers (rows without ref/score that look like section titles)
+          const isObjectiveHeader =
             !refVal && !scoreVal &&
             (/^objective\s+\d/i.test(descVal) || /^section\s+\d/i.test(descVal) ||
               (descVal === descVal.toUpperCase() && descVal.length > 10 && !/^[a-z]\)/i.test(descVal)));
 
-          if (isSectionHeader) { currentSection = descVal; continue; }
-
-          if (!sectionsMap.has(currentSection)) {
-            sectionsMap.set(currentSection, { name: currentSection, source: sheetSource, items: [] });
+          if (isObjectiveHeader) {
+            currentObjective = { name: descVal, source: sheetSource, tasks: [] };
+            currentPhase.objectives.push(currentObjective);
+            continue;
           }
-          sectionsMap.get(currentSection)!.items.push({ ref: refVal, desc: descVal, source: sheetSource });
+
+          // If no objective yet, create a default one
+          if (!currentObjective) {
+            currentObjective = { name: 'General', source: sheetSource, tasks: [] };
+            currentPhase.objectives.push(currentObjective);
+          }
+
+          currentObjective.tasks.push({ ref: refVal, desc: descVal, source: sheetSource });
+        }
+
+        if (currentPhase.objectives.length > 0) {
+          phasesArr.push(currentPhase);
         }
       }
 
-      if (sectionsMap.size === 0) {
+      if (phasesArr.length === 0) {
         toast.error('No checklist data found. Ensure sheets contain a "Description" column header.');
         return;
       }
 
-      const sectionsArr = Array.from(sectionsMap.values());
-      const sectionInserts = sectionsArr.map((s, i) => ({ name: s.name, source: s.source, sort_order: i }));
-      const itemInserts = sectionsArr.flatMap((s, si) =>
-        s.items.map((item, ii) => ({ sectionIndex: si, condition_ref: item.ref, description: item.desc, source: item.source, sort_order: ii }))
-      );
+      // Flatten to indexed arrays for the mutation
+      const phases = phasesArr.map((p, i) => ({ name: p.name, source: p.source, sort_order: i }));
+      const objectives: Array<{ phaseIndex: number; name: string; source: 'EA' | 'EMPr'; sort_order: number }> = [];
+      const tasks: Array<{ objectiveIndex: number; condition_ref: string; description: string; source: 'EA' | 'EMPr'; sort_order: number }> = [];
 
-      await importChecklist.mutateAsync({
-        name: file.name.replace(/\.\w+$/, ''),
-        sections: sectionInserts,
-        items: itemInserts,
+      phasesArr.forEach((phase, pi) => {
+        phase.objectives.forEach((obj, oi) => {
+          const objGlobalIdx = objectives.length;
+          objectives.push({ phaseIndex: pi, name: obj.name, source: obj.source, sort_order: oi });
+          obj.tasks.forEach((task, ti) => {
+            tasks.push({ objectiveIndex: objGlobalIdx, condition_ref: task.ref, description: task.desc, source: task.source, sort_order: ti });
+          });
+        });
       });
-      toast.success(`Imported ${sectionsArr.length} sections with ${itemInserts.length} items`);
+
+      await importChecklist.mutateAsync({ name: file.name.replace(/\.\w+$/, ''), phases, objectives, tasks });
+      toast.success(`Imported ${phases.length} phases, ${objectives.length} objectives, ${tasks.length} tasks`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to parse checklist');
     }
@@ -137,6 +148,10 @@ export default function Templates() {
     if (selectedTemplateId === deleteTarget.id) setSelectedTemplateId(null);
     setDeleteTarget(null);
   };
+
+  const totalItems = dbItems?.length || 0;
+  const totalObjectives = dbObjectives?.length || 0;
+  const totalPhases = dbSections?.length || 0;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -228,8 +243,8 @@ export default function Templates() {
         </div>
       )}
 
-      {/* Template Detail View */}
-      {viewingTemplate && displaySections.length > 0 && (
+      {/* Template Detail View — 3-Level Hierarchy */}
+      {viewingTemplate && dbSections && dbSections.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="bg-card border rounded-lg">
           <div className="p-5 border-b">
             <div className="flex items-center gap-3">
@@ -238,43 +253,66 @@ export default function Templates() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold">{templateName}</h3>
+                  <h3 className="text-base font-semibold">{viewingTemplate.name}</h3>
                   <CheckCircle2 size={14} className="text-success" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Version {templateVersion} • {displayItems.length} items • {displaySections.length} sections
+                  Version {viewingTemplate.version} • {totalPhases} phases • {totalObjectives} objectives • {totalItems} tasks
                 </p>
               </div>
             </div>
           </div>
 
           <div className="divide-y">
-            {displaySections.map(section => {
-              const sItems = displayItems.filter(i => i.sectionId === section.id);
-              const isExpanded = expandedSections.has(section.id);
+            {dbSections.map(phase => {
+              const phaseObjectives = dbObjectives?.filter(o => o.section_id === phase.id) || [];
+              const isPhaseExpanded = expandedPhases.has(phase.id);
+              const phaseItemCount = phaseObjectives.reduce((acc, obj) => {
+                return acc + (dbItems?.filter(i => i.objective_id === obj.id).length || 0);
+              }, 0);
 
               return (
-                <div key={section.id}>
-                  <button onClick={() => toggleSection(section.id)}
+                <div key={phase.id}>
+                  <button onClick={() => togglePhase(phase.id)}
                     className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors text-left">
-                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'
-                    }`}>{section.source}</span>
-                    <span className="text-sm font-medium flex-1">{section.name}</span>
-                    <span className="text-xs text-muted-foreground">{sItems.length} items</span>
+                      phase.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'
+                    }`}>{phase.source}</span>
+                    <span className="text-sm font-semibold flex-1">{phase.name}</span>
+                    <span className="text-xs text-muted-foreground">{phaseObjectives.length} obj • {phaseItemCount} tasks</span>
                   </button>
 
-                  {isExpanded && (
-                    <div className="px-5 pb-3">
-                      <div className="bg-muted/20 rounded-md divide-y divide-border">
-                        {sItems.map(item => (
-                          <div key={item.id} className="px-3 py-2 text-xs flex gap-3">
-                            <span className="text-muted-foreground w-8 flex-shrink-0">{item.conditionRef}</span>
-                            <span className="text-foreground">{item.description}</span>
+                  {isPhaseExpanded && (
+                    <div className="pl-8 divide-y border-t">
+                      {phaseObjectives.map(obj => {
+                        const objItems = dbItems?.filter(i => i.objective_id === obj.id) || [];
+                        const isObjExpanded = expandedObjectives.has(obj.id);
+
+                        return (
+                          <div key={obj.id}>
+                            <button onClick={() => toggleObjective(obj.id)}
+                              className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/10 transition-colors text-left">
+                              {isObjExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                              <span className="text-sm font-medium flex-1 text-foreground/80">{obj.name}</span>
+                              <span className="text-xs text-muted-foreground">{objItems.length} tasks</span>
+                            </button>
+
+                            {isObjExpanded && (
+                              <div className="px-5 pb-3 pl-10">
+                                <div className="bg-muted/20 rounded-md divide-y divide-border">
+                                  {objItems.map(item => (
+                                    <div key={item.id} className="px-3 py-2 text-xs flex gap-3">
+                                      <span className="text-muted-foreground w-12 flex-shrink-0">{item.condition_ref}</span>
+                                      <span className="text-foreground">{item.description}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -290,7 +328,7 @@ export default function Templates() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Template</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will permanently remove the template and all its sections and items. Projects using this template will need a new one assigned.
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This will permanently remove the template and all its phases, objectives, and tasks.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

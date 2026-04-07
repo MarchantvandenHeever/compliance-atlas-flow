@@ -37,14 +37,14 @@ export function useTemplateSections(templateId?: string) {
   });
 }
 
-export function useTemplateItems(sectionIds?: string[]) {
+export function useTemplateObjectives(sectionIds?: string[]) {
   const { user } = useAuth();
   return useQuery({
-    queryKey: ['template-items', sectionIds],
+    queryKey: ['template-objectives', sectionIds],
     queryFn: async () => {
       if (!sectionIds?.length) return [];
       const { data, error } = await supabase
-        .from('checklist_items')
+        .from('checklist_objectives')
         .select('*')
         .in('section_id', sectionIds)
         .order('sort_order');
@@ -55,18 +55,45 @@ export function useTemplateItems(sectionIds?: string[]) {
   });
 }
 
+export function useTemplateItems(objectiveIds?: string[]) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['template-items', objectiveIds],
+    queryFn: async () => {
+      if (!objectiveIds?.length) return [];
+      const { data, error } = await supabase
+        .from('checklist_items')
+        .select('*')
+        .in('objective_id', objectiveIds)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!objectiveIds?.length,
+  });
+}
+
 export function useDeleteTemplate() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (templateId: string) => {
-      // Delete items, sections, then template (cascade would also work if FK set)
+      // Get sections
       const { data: sections } = await supabase
         .from('checklist_sections')
         .select('id')
         .eq('template_id', templateId);
       if (sections?.length) {
         const sIds = sections.map(s => s.id);
-        await supabase.from('checklist_items').delete().in('section_id', sIds);
+        // Get objectives
+        const { data: objectives } = await supabase
+          .from('checklist_objectives')
+          .select('id')
+          .in('section_id', sIds);
+        if (objectives?.length) {
+          const oIds = objectives.map(o => o.id);
+          await supabase.from('checklist_items').delete().in('objective_id', oIds);
+        }
+        await supabase.from('checklist_objectives').delete().in('section_id', sIds);
       }
       await supabase.from('checklist_sections').delete().eq('template_id', templateId);
       const { error } = await supabase.from('checklist_templates').delete().eq('id', templateId);
@@ -85,10 +112,11 @@ export function useImportChecklist() {
   const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ name, sections, items }: {
+    mutationFn: async ({ name, phases, objectives, tasks }: {
       name: string;
-      sections: Array<{ name: string; source: 'EA' | 'EMPr'; sort_order: number }>;
-      items: Array<{ sectionIndex: number; condition_ref: string; description: string; source: 'EA' | 'EMPr'; sort_order: number }>;
+      phases: Array<{ name: string; source: 'EA' | 'EMPr'; sort_order: number }>;
+      objectives: Array<{ phaseIndex: number; name: string; source: 'EA' | 'EMPr'; sort_order: number }>;
+      tasks: Array<{ objectiveIndex: number; condition_ref: string; description: string; source: 'EA' | 'EMPr'; sort_order: number }>;
     }) => {
       // Create template
       const { data: tpl, error: tplErr } = await supabase
@@ -98,31 +126,44 @@ export function useImportChecklist() {
         .single();
       if (tplErr) throw tplErr;
 
-      // Create sections
-      const sectionInserts = sections.map(s => ({
+      // Create phases (sections)
+      const phaseInserts = phases.map(p => ({
         template_id: tpl.id,
-        name: s.name,
-        source: s.source,
-        sort_order: s.sort_order,
+        name: p.name,
+        source: p.source,
+        sort_order: p.sort_order,
       }));
-      const { data: secs, error: secErr } = await supabase
+      const { data: phasesData, error: phaseErr } = await supabase
         .from('checklist_sections')
-        .insert(sectionInserts)
+        .insert(phaseInserts)
         .select();
-      if (secErr) throw secErr;
+      if (phaseErr) throw phaseErr;
 
-      // Create items mapped to section IDs
-      const itemInserts = items.map(item => ({
-        section_id: secs[item.sectionIndex].id,
-        condition_ref: item.condition_ref,
-        description: item.description,
-        source: item.source,
-        sort_order: item.sort_order,
+      // Create objectives
+      const objInserts = objectives.map(o => ({
+        section_id: phasesData[o.phaseIndex].id,
+        name: o.name,
+        source: o.source,
+        sort_order: o.sort_order,
       }));
-      const { error: itemErr } = await supabase
+      const { data: objsData, error: objErr } = await supabase
+        .from('checklist_objectives')
+        .insert(objInserts)
+        .select();
+      if (objErr) throw objErr;
+
+      // Create tasks (items)
+      const taskInserts = tasks.map(t => ({
+        objective_id: objsData[t.objectiveIndex].id,
+        condition_ref: t.condition_ref,
+        description: t.description,
+        source: t.source,
+        sort_order: t.sort_order,
+      }));
+      const { error: taskErr } = await supabase
         .from('checklist_items')
-        .insert(itemInserts);
-      if (itemErr) throw itemErr;
+        .insert(taskInserts);
+      if (taskErr) throw taskErr;
 
       return tpl;
     },
