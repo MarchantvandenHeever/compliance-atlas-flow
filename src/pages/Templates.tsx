@@ -281,7 +281,7 @@ export default function Templates() {
           </div>
 
           <div className="divide-y">
-            {dbSections.map(phase => {
+            {dbSections.filter(p => !/all\s*conditions/i.test(p.name)).map(phase => {
               const phaseObjectives = dbObjectives?.filter(o => o.section_id === phase.id) || [];
               const isPhaseExpanded = expandedPhases.has(phase.id);
               const phaseItemCount = phaseObjectives.reduce((acc, obj) => {
