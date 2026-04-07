@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCreateProject } from '@/hooks/useProjects';
 import { useTemplates } from '@/hooks/useTemplates';
+import { supabase } from '@/integrations/supabase/client';
 import { Plus, Loader2 } from 'lucide-react';
 
 export default function NewProjectDialog() {
