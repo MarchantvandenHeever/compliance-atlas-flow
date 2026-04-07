@@ -250,9 +250,9 @@ export default function AuditCapture() {
             <select
               value={templateId || ''}
               onChange={e => {
-                const params = new URLSearchParams(searchParams);
+                const params = new URLSearchParams();
+                params.set('projectId', projectId);
                 params.set('templateId', e.target.value);
-                if (auditId) params.delete('auditId');
                 navigate(`/audit?${params.toString()}`);
               }}
               className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
@@ -266,6 +266,34 @@ export default function AuditCapture() {
             </select>
           </>
         )}
+
+        {projectId && templateId && (() => {
+          const templateAudits = auditInstances?.filter(a => a.template_id === templateId) || [];
+          if (templateAudits.length === 0) return null;
+          return (
+            <>
+              <label className="text-xs font-medium text-muted-foreground ml-2">Audit:</label>
+              <select
+                value={auditId || ''}
+                onChange={e => {
+                  const params = new URLSearchParams();
+                  params.set('projectId', projectId);
+                  params.set('templateId', templateId);
+                  if (e.target.value) params.set('auditId', e.target.value);
+                  navigate(`/audit?${params.toString()}`);
+                }}
+                className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
+              >
+                <option value="">+ New audit</option>
+                {templateAudits.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
+                  </option>
+                ))}
+              </select>
+            </>
+          );
+        })()}
       </div>
 
       {isLocked && (
