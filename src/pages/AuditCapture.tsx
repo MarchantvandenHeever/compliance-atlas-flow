@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronRight, Save, Search, Loader2 } from 'lucide-react';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
@@ -38,6 +38,7 @@ export default function AuditCapture() {
   const { data: dbSectionOverrides } = useAuditSectionOverrides(auditId || undefined);
   const saveResponses = useSaveAuditResponses();
   const saveSectionOverrides = useSaveAuditSectionOverrides();
+  const createAudit = useCreateAudit();
 
   const [inactiveSections, setInactiveSections] = useState<Set<string>>(new Set());
 
@@ -166,11 +167,34 @@ export default function AuditCapture() {
   const completionPct = activeItemCount > 0 ? Math.round(((metrics.compliantCount + metrics.nonCompliantCount + metrics.notedCount) / metrics.totalItems) * 100) : 0;
 
   const handleSaveDraft = async () => {
-    if (!auditId) {
-      const { toast } = await import('sonner');
-      toast.info('Create an audit from the Projects page to save to database.');
-      return;
+    let currentAuditId = auditId;
+
+    // Auto-create audit if none exists yet
+    if (!currentAuditId) {
+      if (!projectId || !templateId) {
+        const { toast } = await import('sonner');
+        toast.info('Select a project and template first.');
+        return;
+      }
+      try {
+        const now = new Date();
+        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const newAudit = await createAudit.mutateAsync({
+          project_id: projectId,
+          template_id: templateId,
+          period,
+          type: 'monthly',
+        });
+        currentAuditId = newAudit.id;
+        // Update URL with new auditId so subsequent saves use it
+        const params = new URLSearchParams(searchParams);
+        params.set('auditId', currentAuditId);
+        navigate(`/audit?${params.toString()}`, { replace: true });
+      } catch {
+        return; // error toast already shown by useCreateAudit
+      }
     }
+
     const responsesToSave = Object.entries(responses)
       .filter(([_, r]) => r.status)
       .map(([checklistItemId, r]) => ({
@@ -179,11 +203,10 @@ export default function AuditCapture() {
         comments: r.comments || '', actions: r.actions || '',
       }));
 
-    // Save section overrides alongside responses
     const overrides = sections.map(s => ({ section_id: s.id, is_active: !inactiveSections.has(s.id) }));
     await Promise.all([
-      saveResponses.mutateAsync({ auditId, responses: responsesToSave }),
-      saveSectionOverrides.mutateAsync({ auditId, overrides }),
+      saveResponses.mutateAsync({ auditId: currentAuditId, responses: responsesToSave }),
+      saveSectionOverrides.mutateAsync({ auditId: currentAuditId, overrides }),
     ]);
   };
 
@@ -246,9 +269,9 @@ export default function AuditCapture() {
           <span className="text-xs text-muted-foreground">
             {completionPct}% complete • {metrics.compliancePercentage}% compliant
           </span>
-          <button onClick={handleSaveDraft} disabled={saveResponses.isPending}
+          <button onClick={handleSaveDraft} disabled={saveResponses.isPending || createAudit.isPending}
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-            {saveResponses.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {(saveResponses.isPending || createAudit.isPending) ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Save Draft
           </button>
         </div>
