@@ -79,6 +79,15 @@ export default function AuditCapture() {
     }
   }, [dbResponses]);
 
+  // Load section overrides from DB
+  useMemo(() => {
+    if (dbSectionOverrides?.length) {
+      const inactive = new Set<string>();
+      dbSectionOverrides.forEach(o => { if (!o.is_active) inactive.add(o.section_id); });
+      setInactiveSections(inactive);
+    }
+  }, [dbSectionOverrides]);
+
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [expandedObjectives, setExpandedObjectives] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
