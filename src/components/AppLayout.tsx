@@ -5,6 +5,7 @@ import {
   AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import cesLogo from '@/assets/ces-logo.png';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -48,9 +49,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm font-display">CES</span>
-              </div>
+              <img src={cesLogo} alt="CES" className="h-8 w-auto" />
               <div>
                 <p className="text-sm font-semibold font-display leading-tight">ECO Monitor</p>
                 <p className="text-[10px] text-sidebar-foreground/60">Environmental Compliance</p>
@@ -58,9 +57,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           )}
           {collapsed && (
-            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mx-auto">
-              <span className="text-primary-foreground font-bold text-xs">C</span>
-            </div>
+            <img src={cesLogo} alt="CES" className="h-7 w-auto mx-auto" />
           )}
           <button onClick={() => setCollapsed(!collapsed)} className="hidden lg:flex text-sidebar-foreground/60 hover:text-sidebar-foreground p-1">
             {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
