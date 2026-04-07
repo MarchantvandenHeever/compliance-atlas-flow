@@ -519,6 +519,30 @@ export default function AuditCapture() {
                                           ))}
                                         </div>
                                       </div>
+                                      {/* Inline review comments for this item */}
+                                      {(() => {
+                                        const itemComments = reviewComments?.filter(c => c.checklist_item_id === item.id && c.status === 'open');
+                                        if (!itemComments?.length) return null;
+                                        return (
+                                          <div className="mx-4 mb-1 mt-0 border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 rounded-md px-3 py-2">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                              <MessageSquare size={12} className="text-amber-600" />
+                                              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Reviewer Comments</span>
+                                            </div>
+                                            {itemComments.map(c => (
+                                              <div key={c.id} className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 mt-1">
+                                                <span className="flex-1">"{c.comment}"</span>
+                                                {!isLocked && (
+                                                  <button onClick={() => resolveComment.mutate({ commentId: c.id, auditId: auditId! })}
+                                                    className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 flex-shrink-0">
+                                                    <CheckCircle2 size={10} /> Resolve
+                                                  </button>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        );
+                                      })()}
                                       <AnimatePresence>
                                         {isRowExpanded && (
                                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
