@@ -24,6 +24,19 @@ interface ReportRequest {
   reportNumber?: string;
   author?: string;
   reviewer?: string;
+  clientLogoUrl?: string;
+}
+
+// Fetch image as base64 data URL
+async function fetchImageBase64(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const ct = res.headers.get("content-type") || "image/png";
+    return `data:${ct};base64,${b64}`;
+  } catch { return null; }
 }
 
 Deno.serve(async (req) => {
