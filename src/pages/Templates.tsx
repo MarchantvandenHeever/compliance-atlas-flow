@@ -43,44 +43,72 @@ export default function Templates() {
 
     try {
       const data = await file.arrayBuffer();
-      const wb = XLSX.read(data);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-      if (rows.length < 2) { toast.error('Spreadsheet appears empty'); return; }
-
-      // Parse: expect columns like: Section, Ref, Description, Source
-      // Auto-detect header row
-      const headerRow = rows.findIndex(r => 
-        r.some(c => typeof c === 'string' && /ref|condition|description|section/i.test(c))
-      );
-      const startRow = headerRow >= 0 ? headerRow + 1 : 1;
-      const headers = rows[headerRow >= 0 ? headerRow : 0].map(h => String(h || '').toLowerCase());
-
-      const sectionCol = headers.findIndex(h => /section|category|objective/i.test(h));
-      const refCol = headers.findIndex(h => /ref|condition|number|no\./i.test(h));
-      const descCol = headers.findIndex(h => /desc|requirement|condition|item/i.test(h));
-      const sourceCol = headers.findIndex(h => /source|type|origin/i.test(h));
-
-      if (descCol < 0) { toast.error('Could not find description column'); return; }
+      const wb = XLSX.read(data, { cellDates: true });
 
       const sectionsMap = new Map<string, { name: string; source: 'EA' | 'EMPr'; items: Array<{ ref: string; desc: string; source: 'EA' | 'EMPr' }> }>();
-      let currentSection = 'General';
+      const skipSheetPattern = /contents|summary|cover|index|^toc$/i;
 
-      for (let i = startRow; i < rows.length; i++) {
-        const row = rows[i];
-        if (!row || !row[descCol]) continue;
+      for (const sheetName of wb.SheetNames) {
+        if (skipSheetPattern.test(sheetName)) continue;
 
-        const sectionName = sectionCol >= 0 && row[sectionCol] ? String(row[sectionCol]) : currentSection;
-        currentSection = sectionName;
-        const source: 'EA' | 'EMPr' = sourceCol >= 0 && /empr/i.test(String(row[sourceCol] || '')) ? 'EMPr' : 'EA';
-        const ref = refCol >= 0 ? String(row[refCol] || '') : '';
-        const desc = String(row[descCol]);
+        const ws = wb.Sheets[sheetName];
+        if (!ws) continue;
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (rows.length < 2) continue;
 
-        if (!sectionsMap.has(sectionName)) {
-          sectionsMap.set(sectionName, { name: sectionName, source, items: [] });
+        // Detect source from sheet name
+        const sheetSource: 'EA' | 'EMPr' = /empr/i.test(sheetName) ? 'EMPr' : 'EA';
+
+        // Find header row containing "description"
+        const headerIdx = rows.findIndex(r =>
+          r.some(c => typeof c === 'string' && /^description$|condition\s*no|ref/i.test(String(c).trim()))
+        );
+        if (headerIdx < 0) continue; // no checklist data on this sheet
+
+        const headers = rows[headerIdx].map(h => String(h || '').trim().toLowerCase());
+        const descCol = headers.findIndex(h => /^description$|requirement|condition\s+desc/i.test(h));
+        const refCol = headers.findIndex(h => /condition\s*no|ref|number|^no\.?$/i.test(h));
+        const scoreCol = headers.findIndex(h => /^score$|^rating$/i.test(h));
+
+        if (descCol < 0) continue;
+
+        let currentSection = sheetName; // fallback section = sheet name
+
+        for (let i = headerIdx + 1; i < rows.length; i++) {
+          const row = rows[i];
+          if (!row) continue;
+
+          const descVal = String(row[descCol] || '').trim();
+          if (!descVal) continue;
+
+          const refVal = refCol >= 0 ? String(row[refCol] || '').trim() : '';
+          const scoreVal = scoreCol >= 0 ? String(row[scoreCol] || '').trim() : '';
+
+          // Detect inline section headers:
+          // Has description text but NO condition ref and NO score, and looks like a title
+          const isSectionHeader =
+            !refVal &&
+            !scoreVal &&
+            (/^objective\s+\d/i.test(descVal) ||
+             /^section\s+\d/i.test(descVal) ||
+             (descVal === descVal.toUpperCase() && descVal.length > 10 && !/^[a-z]\)/i.test(descVal)));
+
+          if (isSectionHeader) {
+            currentSection = descVal;
+            continue;
+          }
+
+          // Regular checklist item
+          if (!sectionsMap.has(currentSection)) {
+            sectionsMap.set(currentSection, { name: currentSection, source: sheetSource, items: [] });
+          }
+          sectionsMap.get(currentSection)!.items.push({ ref: refVal, desc: descVal, source: sheetSource });
         }
-        sectionsMap.get(sectionName)!.items.push({ ref, desc, source });
+      }
+
+      if (sectionsMap.size === 0) {
+        toast.error('No checklist data found in any sheet. Ensure sheets contain a "Description" column header.');
+        return;
       }
 
       const sectionsArr = Array.from(sectionsMap.values());
@@ -95,11 +123,14 @@ export default function Templates() {
         }))
       );
 
+      const totalItems = itemInserts.length;
       await importChecklist.mutateAsync({
         name: file.name.replace(/\.\w+$/, ''),
         sections: sectionInserts,
         items: itemInserts,
       });
+
+      toast.success(`Imported ${sectionsArr.length} sections with ${totalItems} items`);
     } catch (err: any) {
       toast.error(err.message || 'Failed to parse checklist');
     }
