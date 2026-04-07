@@ -393,7 +393,13 @@ Deno.serve(async (req) => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...SLATE);
-    const methodText = `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.\n\nCompliance was rated using the following scale:\n\n• C (Compliant) - The condition has been met\n• NC (Non-Compliant) - The condition has not been met\n• N/A (Not Applicable) - The condition is not applicable to the current phase\n\nThe compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`;
+    let methodText = `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.\n\nCompliance was rated using the following scale:\n\n• C (Compliant) - The condition has been met\n• NC (Non-Compliant) - The condition has not been met\n• N/A (Not Applicable) - The condition is not applicable to the current phase\n\nThe compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`;
+
+    if (inactiveSections.length > 0) {
+      const inactiveNames = inactiveSections.map((s: any) => s.name).join(", ");
+      methodText += `\n\nThe following phase(s) were marked as inactive and were therefore not considered as part of this audit: ${inactiveNames}. Items within inactive phases are excluded from the compliance calculations.`;
+    }
+
     const methodLines = doc.splitTextToSize(methodText, contentW);
     doc.text(methodLines, margin, y);
     y += methodLines.length * 5 + 15;
