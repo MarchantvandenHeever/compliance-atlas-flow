@@ -52,7 +52,10 @@ export default function Templates() {
       const wb = XLSX.read(data, { cellDates: true });
 
       // 3-level structure: Phase → Objective → Task
-      const phasesArr: Array<{ name: string; source: 'EA' | 'EMPr'; objectives: Array<{ name: string; source: 'EA' | 'EMPr'; tasks: Array<{ ref: string; desc: string; source: 'EA' | 'EMPr' }> }> }> = [];
+      type TaskItem = { ref: string; desc: string; source: 'EA' | 'EMPr' };
+      type ObjItem = { name: string; source: 'EA' | 'EMPr'; tasks: TaskItem[] };
+      type PhaseItem = { name: string; source: 'EA' | 'EMPr'; objectives: ObjItem[] };
+      const phasesMap = new Map<string, PhaseItem>();
       const skipSheetPattern = /contents|summary|cover|index|^toc$/i;
 
       for (const sheetName of wb.SheetNames) {
@@ -64,55 +67,69 @@ export default function Templates() {
 
         const sheetSource: 'EA' | 'EMPr' = /empr/i.test(sheetName) ? 'EMPr' : 'EA';
 
+        // Find header row
         const headerIdx = rows.findIndex(r =>
-          r.some(c => typeof c === 'string' && /^description$|condition\s*no|ref/i.test(String(c).trim()))
+          r.some(c => typeof c === 'string' && /description|phase|objective/i.test(String(c).trim()))
         );
         if (headerIdx < 0) continue;
 
         const headers = rows[headerIdx].map(h => String(h || '').trim().toLowerCase());
+        const phaseCol = headers.findIndex(h => /^phase$/i.test(h));
+        const objCol = headers.findIndex(h => /^objective$/i.test(h));
         const descCol = headers.findIndex(h => /^description$|requirement|condition\s+desc/i.test(h));
-        const refCol = headers.findIndex(h => /condition\s*no|ref|number|^no\.?$/i.test(h));
-        const scoreCol = headers.findIndex(h => /^score$|^rating$/i.test(h));
+        const refCol = headers.findIndex(h => /condition\s*no|ref|number|^no\.?$|^score$/i.test(h));
 
         if (descCol < 0) continue;
 
-        // Each sheet = Phase
-        let currentPhase: typeof phasesArr[0] = { name: sheetName, source: sheetSource, objectives: [] };
-        let currentObjective: typeof currentPhase.objectives[0] | null = null;
+        // Track current phase/objective names for rows that leave those cells blank
+        let currentPhaseName = '';
+        let currentObjName = '';
 
         for (let i = headerIdx + 1; i < rows.length; i++) {
           const row = rows[i];
           if (!row) continue;
+
+          const rawPhase = phaseCol >= 0 ? String(row[phaseCol] || '').trim() : '';
+          const rawObj = objCol >= 0 ? String(row[objCol] || '').trim() : '';
           const descVal = String(row[descCol] || '').trim();
-          if (!descVal) continue;
           const refVal = refCol >= 0 ? String(row[refCol] || '').trim() : '';
-          const scoreVal = scoreCol >= 0 ? String(row[scoreCol] || '').trim() : '';
 
-          // Detect objective headers (rows without ref/score that look like section titles)
-          const isObjectiveHeader =
-            !refVal && !scoreVal &&
-            (/^objective\s+\d/i.test(descVal) || /^section\s+\d/i.test(descVal) ||
-              (descVal === descVal.toUpperCase() && descVal.length > 10 && !/^[a-z]\)/i.test(descVal)));
+          // Update current phase/objective when a new value appears
+          if (rawPhase) currentPhaseName = rawPhase;
+          if (rawObj) currentObjName = rawObj;
 
-          if (isObjectiveHeader) {
-            currentObjective = { name: descVal, source: sheetSource, tasks: [] };
-            currentPhase.objectives.push(currentObjective);
+          // If no phase name yet, use the sheet name
+          if (!currentPhaseName) currentPhaseName = sheetName;
+
+          // Skip rows that are only phase/objective headers with no description
+          if (!descVal) continue;
+
+          // If the description looks like an objective header and no explicit objective column exists
+          if (objCol < 0 && !rawObj && /^objective\s+\d/i.test(descVal)) {
+            currentObjName = descVal;
             continue;
           }
 
-          // If no objective yet, create a default one
-          if (!currentObjective) {
-            currentObjective = { name: 'General', source: sheetSource, tasks: [] };
-            currentPhase.objectives.push(currentObjective);
+          if (!currentObjName) currentObjName = 'General';
+
+          // Get or create phase
+          if (!phasesMap.has(currentPhaseName)) {
+            phasesMap.set(currentPhaseName, { name: currentPhaseName, source: sheetSource, objectives: [] });
+          }
+          const phase = phasesMap.get(currentPhaseName)!;
+
+          // Get or create objective within phase
+          let objective = phase.objectives.find(o => o.name === currentObjName);
+          if (!objective) {
+            objective = { name: currentObjName, source: sheetSource, tasks: [] };
+            phase.objectives.push(objective);
           }
 
-          currentObjective.tasks.push({ ref: refVal, desc: descVal, source: sheetSource });
-        }
-
-        if (currentPhase.objectives.length > 0) {
-          phasesArr.push(currentPhase);
+          objective.tasks.push({ ref: refVal, desc: descVal, source: sheetSource });
         }
       }
+
+      const phasesArr = Array.from(phasesMap.values()).filter(p => p.objectives.length > 0);
 
       if (phasesArr.length === 0) {
         toast.error('No checklist data found. Ensure sheets contain a "Description" column header.');
