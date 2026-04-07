@@ -147,6 +147,8 @@ export default function AuditCapture() {
     });
   }, [items, searchQuery, statusFilter, responses]);
 
+  const has3Level = objectives.length > 0;
+
   // Get active item IDs (exclude items in inactive sections)
   const activeItemIds = useMemo(() => {
     if (!has3Level && !objectives.length) return new Set(items.map(i => i.id));
