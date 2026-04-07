@@ -302,22 +302,11 @@ export default function Templates() {
 
                   {isPhaseExpanded && (
                     <div className="pl-8 divide-y border-t">
-                      {phaseObjectives.map(obj => {
-                        const objItems = dbItems?.filter(i => i.objective_id === obj.id) || [];
-                        const isObjExpanded = expandedObjectives.has(obj.id);
-
-                        return (
-                          <div key={obj.id}>
-                            <button onClick={() => toggleObjective(obj.id)}
-                              className="w-full flex items-center gap-3 px-5 py-2.5 hover:bg-muted/10 transition-colors text-left">
-                              {isObjExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                              <span className="text-sm font-medium flex-1 text-foreground/80">{obj.name}</span>
-                              <span className="text-xs text-muted-foreground">{objItems.length} tasks</span>
-                            </button>
-
+                      {phaseObjectives.map(obj => (
+                          <div key={obj.id} className="px-5 py-2.5">
+                            <span className="text-sm font-medium text-foreground/80">{obj.name}</span>
                           </div>
-                        );
-                      })}
+                        ))}
                     </div>
                   )}
                 </div>
