@@ -12,6 +12,7 @@ import {
   useRequestAmendments, useApproveAudit, useStartReview,
 } from '@/hooks/useReviewData';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMyProjectIds } from '@/hooks/useProjectTeam';
 import ProjectFilter from '@/components/ProjectFilter';
 import { getStatusDotClass } from '@/lib/compliance';
 
@@ -372,6 +373,9 @@ function AuditReviewDetail({
 export default function Reviews() {
   const { data: allAudits } = useAuditInstances();
   const { data: projects } = useProjects();
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
+  const { data: myReviewerProjectIds } = useMyProjectIds('reviewer');
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedAudit, setSelectedAudit] = useState<any | null>(null);
 
@@ -381,6 +385,8 @@ export default function Reviews() {
   const filteredAudits = (allAudits || [])
     .filter(a => reviewableStatuses.includes(a.status))
     .filter(a => !selectedProject || a.project_id === selectedProject)
+    // Non-admin reviewers only see audits for their assigned projects
+    .filter(a => isAdmin || !myReviewerProjectIds || myReviewerProjectIds.includes(a.project_id))
     .sort((a, b) => new Date(b.submitted_at || b.updated_at).getTime() - new Date(a.submitted_at || a.updated_at).getTime());
 
   const handleStartReview = async (audit: any) => {

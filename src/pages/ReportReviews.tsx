@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjects } from '@/hooks/useProjects';
+import { useMyProjectIds } from '@/hooks/useProjectTeam';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,8 +21,10 @@ const STATUS_OPTIONS = [
 ];
 
 export default function ReportReviews() {
-  const { user } = useAuth();
+  const { user, hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
   const { data: projects } = useProjects();
+  const { data: myReviewerProjectIds } = useMyProjectIds('reviewer');
   const [statusFilter, setStatusFilter] = useState('all');
   const [projectFilter, setProjectFilter] = useState('all');
   const [selectedReview, setSelectedReview] = useState<any>(null);
@@ -41,9 +44,13 @@ export default function ReportReviews() {
 
   const filteredReviews = reviews?.filter(r => {
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    const audit = r.audit_instances as any;
     if (projectFilter !== 'all') {
-      const audit = r.audit_instances as any;
       if (audit?.project_id !== projectFilter) return false;
+    }
+    // Non-admin reviewers only see reviews for their assigned projects
+    if (!isAdmin && myReviewerProjectIds && audit?.project_id) {
+      if (!myReviewerProjectIds.includes(audit.project_id)) return false;
     }
     return true;
   }) || [];
