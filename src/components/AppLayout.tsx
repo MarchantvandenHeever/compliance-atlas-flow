@@ -85,14 +85,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               key={item.to}
               to={item.to}
               onClick={() => setMobileOpen(false)}
-              className={({ isActive }) => `
+              className={({ isActive }) => {
+                const active = isActive || (item.to !== '/' && location.pathname.startsWith(item.to + '/'));
+                return `
                 flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition-colors
-                ${isActive
+                ${active
                   ? 'bg-sidebar-accent text-sidebar-primary font-medium'
                   : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                 }
                 ${collapsed ? 'justify-center' : ''}
-              `}
+              `;
+              }}
             >
               <item.icon size={18} className="flex-shrink-0" />
               {!collapsed && <span>{item.label}</span>}
@@ -132,7 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex-1">
             <h1 className="text-sm font-medium text-foreground">
-              {navItems.find(n => n.to === location.pathname)?.label || 'ECO Monitor'}
+              {navItems.find(n => location.pathname === n.to || location.pathname.startsWith(n.to + '/'))?.label || 'ECO Monitor'}
             </h1>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
