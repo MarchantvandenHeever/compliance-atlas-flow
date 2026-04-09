@@ -588,10 +588,10 @@ export default function AuditCapture() {
                                                   className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div className="md:col-span-2">
-                                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
+                                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence (Item #{itemNumberMap[item.id]})</label>
                                                 <PhotoUpload responseId={response?.id || item.id}
-                                                  photos={response?.photos?.map(p => ({ url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: '' })) || []}
-                                                  onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation })))}
+                                                  photos={response?.photos?.map(p => ({ id: p.id, url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: (p as any).storagePath || '' })) || []}
+                                                  onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: p.id || '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation, storagePath: p.storagePath })))}
                                                   disabled={isLocked} />
                                               </div>
                                             </div>
