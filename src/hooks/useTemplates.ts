@@ -37,6 +37,24 @@ export function useTemplateSections(templateId?: string) {
   });
 }
 
+export function useMultiTemplateSections(templateIds?: string[]) {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ['template-sections-multi', templateIds],
+    queryFn: async () => {
+      if (!templateIds?.length) return [];
+      const { data, error } = await supabase
+        .from('checklist_sections')
+        .select('*')
+        .in('template_id', templateIds)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user && !!templateIds?.length,
+  });
+}
+
 export function useTemplateObjectives(sectionIds?: string[]) {
   const { user } = useAuth();
   return useQuery({

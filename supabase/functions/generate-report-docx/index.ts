@@ -200,14 +200,40 @@ Deno.serve(async (req) => {
       const { data: sectionOverrides } = await supabase
         .from("audit_section_overrides").select("*").eq("audit_id", auditId);
 
-      if (audit?.template_id) {
+      // Fetch ALL project templates in order for multi-template support
+      const { data: projectTemplates } = await supabase
+        .from("project_templates")
+        .select("template_id, sort_order, checklist_templates(id, name)")
+        .eq("project_id", audit.project_id)
+        .order("sort_order", { ascending: true });
+
+      const templateIds = (projectTemplates || []).map((pt: any) => pt.template_id);
+      if (templateIds.length === 0 && audit?.template_id) {
+        templateIds.push(audit.template_id);
+      }
+
+      if (templateIds.length > 0) {
         const { data: secs } = await supabase
-          .from("checklist_sections").select("*").eq("template_id", audit.template_id).order("sort_order");
-        sections = secs || [];
+          .from("checklist_sections").select("*").in("template_id", templateIds).order("sort_order");
+        
+        const templateOrderMap: Record<string, number> = {};
+        (projectTemplates || []).forEach((pt: any, idx: number) => { templateOrderMap[pt.template_id] = idx; });
+        sections = (secs || []).sort((a: any, b: any) => {
+          const tOrdA = templateOrderMap[a.template_id] ?? 999;
+          const tOrdB = templateOrderMap[b.template_id] ?? 999;
+          if (tOrdA !== tOrdB) return tOrdA - tOrdB;
+          return a.sort_order - b.sort_order;
+        });
+
         const inactiveSectionIds = new Set(
           (sectionOverrides || []).filter((o: any) => !o.is_active).map((o: any) => o.section_id)
         );
-        sections = sections.map((s: any) => ({ ...s, _inactive: inactiveSectionIds.has(s.id) }));
+        sections = sections.map((s: any) => ({
+          ...s,
+          _inactive: inactiveSectionIds.has(s.id),
+          _templateName: (projectTemplates || []).find((pt: any) => pt.template_id === s.template_id)?.checklist_templates?.name || "",
+          _templateOrder: templateOrderMap[s.template_id] ?? 999,
+        }));
 
         const allSectionIds = sections.map((s: any) => s.id);
         if (allSectionIds.length > 0) {

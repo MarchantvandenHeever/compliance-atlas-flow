@@ -1,0 +1,1 @@
+ALTER TABLE public.project_templates ADD COLUMN sort_order integer NOT NULL DEFAULT 0;
