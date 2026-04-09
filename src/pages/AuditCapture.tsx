@@ -54,14 +54,13 @@ export default function AuditCapture() {
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
   const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
+  const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
+
   // Editable audit name
   const [isEditingName, setIsEditingName] = useState(false);
   const [editName, setEditName] = useState('');
   const auditDisplayName = (currentAuditInstance as any)?.name || '';
   useEffect(() => { setEditName(auditDisplayName); }, [auditDisplayName]);
-  const { data: revisionLog } = useRevisionLog(auditId || undefined);
-
-  const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
   const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved' || currentAuditInstance?.status === 'under_review';
   const isAmendmentsRequested = currentAuditInstance?.status === 'amendments_requested' as any;
   const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
