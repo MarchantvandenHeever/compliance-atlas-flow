@@ -62,11 +62,13 @@ export default function Findings() {
   // Build findings list combining NC responses with corrective actions
   const findings = useMemo(() => {
     if (!ncResponses) return [];
-    return ncResponses.map(r => {
+    const severityOrder = { high: 0, medium: 1, low: 2 };
+    const list = ncResponses.map(r => {
       const action = correctiveActions?.find(a => a.audit_id === r.audit_id && a.checklist_item_id === r.checklist_item_id);
       const audit = completedAudits.find(a => a.id === r.audit_id);
       const project = projects.find(p => p.id === audit?.project_id);
       const item = r.checklist_items as any;
+      const severity = ((r as any).nc_severity || action?.severity || 'medium') as 'low' | 'medium' | 'high';
       return {
         id: r.id,
         auditId: r.audit_id,
@@ -81,12 +83,15 @@ export default function Findings() {
         actions: r.actions || '',
         period: audit?.period || '',
         projectName: project?.name || '',
-        severity: (action?.severity || 'medium') as 'low' | 'medium' | 'high',
+        severity,
         status: (action?.status || 'open') as 'open' | 'in_progress' | 'closed',
         assignedTo: action?.assigned_to || '',
         targetDate: action?.target_date || '',
       };
     });
+    // Sort by severity: high first, then medium, then low
+    list.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    return list;
   }, [ncResponses, correctiveActions, completedAudits, projects]);
 
   const filtered = filterStatus === 'all' ? findings : findings.filter(f => f.status === filterStatus);
