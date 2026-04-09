@@ -282,6 +282,7 @@ export default function AuditCapture() {
         checklist_item_id: checklistItemId,
         status: (r.status === 'N/A' ? 'NA' : r.status) as 'C' | 'NC' | 'NA' | null,
         comments: r.comments || '', actions: r.actions || '',
+        nc_severity: r.status === 'NC' ? (r.ncSeverity as any || 'medium') : null,
         photos: r.photos?.map(p => ({
           id: p.id || '',
           url: p.url || '',
