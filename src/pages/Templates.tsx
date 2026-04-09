@@ -24,6 +24,8 @@ export default function Templates() {
   const { data: dbTemplates, isLoading } = useTemplates();
   const importChecklist = useImportChecklist();
   const deleteTemplate = useDeleteTemplate();
+  const reorderSections = useReorderSections();
+  const reorderObjectives = useReorderObjectives();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const viewingTemplate = selectedTemplateId
