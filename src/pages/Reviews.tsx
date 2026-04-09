@@ -55,12 +55,33 @@ function AuditReviewDetail({
   const commentsMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     reviewComments?.forEach(c => {
+      if (c.status === 'reviewed') return; // skip reviewed markers from comment map
       const key = c.checklist_item_id || '__general__';
       if (!map[key]) map[key] = [];
       map[key].push(c);
     });
     return map;
   }, [reviewComments]);
+
+  // Track which items have been marked as reviewed
+  const reviewedItemIds = useMemo(() => {
+    const set = new Set<string>();
+    reviewComments?.forEach(c => {
+      if (c.status === 'reviewed' && c.checklist_item_id) set.add(c.checklist_item_id);
+    });
+    return set;
+  }, [reviewComments]);
+
+  // Count total active items for review progress
+  const totalActiveItems = useMemo(() => {
+    return items.filter(i => {
+      const obj = objectives.find(o => o.id === i.objectiveId);
+      if (!obj) return false;
+      return !inactiveSections.has(obj.sectionId);
+    }).length;
+  }, [items, objectives, inactiveSections]);
+
+  const reviewProgress = totalActiveItems > 0 ? Math.round((reviewedItemIds.size / totalActiveItems) * 100) : 0;
 
   const inactiveSections = useMemo(() => {
     const set = new Set<string>();
