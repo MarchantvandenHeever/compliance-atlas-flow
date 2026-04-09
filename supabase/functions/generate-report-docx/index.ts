@@ -874,23 +874,75 @@ Deno.serve(async (req) => {
     }));
 
     if (photos.length > 0) {
-      const photoCols = [600, 1800, 2600, 2200, 1826];
-      children.push(new Table({
-        width: { size: CONTENT_W, type: WidthType.DXA },
-        columnWidths: photoCols,
-        rows: [
-          new TableRow({ children: [headerCell("#", photoCols[0], TEAL), headerCell("Item Ref", photoCols[1], TEAL), headerCell("Caption", photoCols[2], TEAL), headerCell("GPS Location", photoCols[3], TEAL), headerCell("Date", photoCols[4], TEAL)] }),
-          ...photos.map((p: any, idx: number) => new TableRow({
-            children: [
-              dataCell(String(idx + 1), photoCols[0]),
-              dataCell(photoItemRefMap.get(p.id) || "-", photoCols[1]),
-              dataCell(p.caption || "No caption", photoCols[2]),
-              dataCell(p.gps_location || "N/A", photoCols[3]),
-              dataCell(p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A", photoCols[4]),
-            ],
-          })),
-        ],
-      }));
+      // Fetch actual photo images from storage
+      const storageBase = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/`;
+      const photoBuffers: (Uint8Array | null)[] = [];
+      for (const p of photos) {
+        if (p.storage_path) {
+          try {
+            const res = await fetch(storageBase + p.storage_path);
+            if (res.ok) {
+              photoBuffers.push(new Uint8Array(await res.arrayBuffer()));
+            } else {
+              photoBuffers.push(null);
+            }
+          } catch {
+            photoBuffers.push(null);
+          }
+        } else {
+          photoBuffers.push(null);
+        }
+      }
+
+      // Render each photo as a card block: header row, image row, metadata row
+      for (let idx = 0; idx < photos.length; idx++) {
+        const p = photos[idx];
+        const itemRef = photoItemRefMap.get(p.id) || "-";
+        const caption = p.caption || "No caption";
+        const gps = p.gps_location || "N/A";
+        const dateStr = p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A";
+        const imgBuf = photoBuffers[idx];
+        const imgType = p.storage_path?.toLowerCase().endsWith(".png") ? "png" : "jpg";
+
+        // Photo header
+        children.push(new Paragraph({
+          spacing: { before: 300, after: 100 },
+          shading: { fill: TEAL, type: ShadingType.CLEAR },
+          children: [new TextRun({ text: `Photo ${idx + 1} \u2014 ${itemRef}`, font: "Arial", size: 18, bold: true, color: WHITE })],
+        }));
+
+        // Actual image
+        if (imgBuf) {
+          children.push(new Paragraph({
+            spacing: { after: 100 },
+            alignment: AlignmentType.CENTER,
+            children: [new ImageRun({
+              type: imgType as "png" | "jpg",
+              data: imgBuf,
+              transformation: { width: 500, height: 350 },
+              altText: { title: `Photo ${idx + 1}`, description: caption, name: `photo-${idx + 1}` },
+            })],
+          }));
+        } else {
+          children.push(new Paragraph({
+            spacing: { after: 100 },
+            children: [new TextRun({ text: "[No image available]", font: "Arial", size: 18, italics: true, color: GREY })],
+          }));
+        }
+
+        // Photo metadata table
+        const metaCols = [2500, CONTENT_W - 2500];
+        children.push(new Table({
+          width: { size: CONTENT_W, type: WidthType.DXA },
+          columnWidths: metaCols,
+          rows: [
+            new TableRow({ children: [dataCell("Caption:", metaCols[0], { bold: true }), dataCell(caption, metaCols[1])] }),
+            new TableRow({ children: [dataCell("Item Ref:", metaCols[0], { bold: true }), dataCell(itemRef, metaCols[1])] }),
+            new TableRow({ children: [dataCell("GPS Location:", metaCols[0], { bold: true }), dataCell(gps, metaCols[1])] }),
+            new TableRow({ children: [dataCell("Date:", metaCols[0], { bold: true }), dataCell(dateStr, metaCols[1])] }),
+          ],
+        }));
+      }
     } else {
       children.push(nothingToReport());
     }
