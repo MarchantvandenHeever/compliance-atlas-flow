@@ -162,6 +162,25 @@ Deno.serve(async (req) => {
         .from("audit_revision_log").select("*").eq("audit_id", auditId).order("revision_number", { ascending: true });
       revisionLog = revLog || [];
 
+      // Fetch report review status and reviewer profile
+      const { data: rr } = await supabase
+        .from("report_reviews")
+        .select("*")
+        .eq("audit_id", auditId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (rr && rr.length > 0) {
+        reportReview = rr[0];
+        if (reportReview.reviewer_id) {
+          const { data: revProfile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("user_id", reportReview.reviewer_id)
+            .single();
+          if (revProfile?.display_name) reviewerName = revProfile.display_name;
+        }
+      }
+
       const { data: sectionOverrides } = await supabase
         .from("audit_section_overrides").select("*").eq("audit_id", auditId);
 
