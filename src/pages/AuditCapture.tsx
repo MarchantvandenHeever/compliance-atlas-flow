@@ -30,7 +30,13 @@ export default function AuditCapture() {
 
   const currentProject = projects?.find(p => p.id === projectId);
 
-  const { data: dbSections } = useTemplateSections(templateId || undefined);
+  // Load ALL project templates in order for multi-template audit
+  const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
+  const projectTemplateIds = projectTemplates.map(pt => pt.template_id);
+  // If a single templateId is specified (legacy), use it; otherwise use all project templates
+  const templateIdsToLoad = projectTemplateIds.length > 0 ? projectTemplateIds : (templateId ? [templateId] : []);
+
+  const { data: dbSections } = useMultiTemplateSections(templateIdsToLoad.length > 0 ? templateIdsToLoad : undefined);
   const sectionIds = dbSections?.map(s => s.id);
   const { data: dbObjectives } = useTemplateObjectives(sectionIds);
   const objectiveIds = dbObjectives?.map(o => o.id);
