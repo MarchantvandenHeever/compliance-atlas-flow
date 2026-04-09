@@ -392,7 +392,7 @@ Deno.serve(async (req) => {
     doc.setTextColor(255, 255, 255);
     doc.text(period, margin, metaY + 7);
     doc.text(author, margin + 45, metaY + 7);
-    doc.text(reviewer, margin + 90, metaY + 7);
+    doc.text(reviewerName, margin + 90, metaY + 7);
     doc.text(reviewStatus, margin + 135, metaY + 7);
     doc.setFillColor(...TEAL);
     doc.rect(0, pageH - 8, pageW, 8, "F");
@@ -409,10 +409,12 @@ Deno.serve(async (req) => {
     const revTrackingBody: any[] = [
       ["Document Title:", reportTitle],
       ["Client Name:", projClient],
-      ["Status:", auditData?.status === "approved" ? "Approved" : "Draft"],
+      ["Report Review Status:", reviewStatus],
+      ["Reviewed By:", reviewerName],
+      ["Reviewed Date:", reviewedAtStr],
       ["Issue Date:", new Date().toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })],
       ["Environmental Control Officer:", author],
-      ["Senior Environmental Control Officer / Reviewer:", reviewer],
+      ["Senior Environmental Control Officer / Reviewer:", reviewerName],
     ];
 
     (doc as any).autoTable({
