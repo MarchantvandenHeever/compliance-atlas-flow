@@ -7,7 +7,7 @@ import { useCreateProject } from '@/hooks/useProjects';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useSetProjectTemplates } from '@/hooks/useProjectTemplates';
 import { supabase } from '@/integrations/supabase/client';
-import { Plus, Loader2, X } from 'lucide-react';
+import { Plus, Loader2, X, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
 
 export default function NewProjectDialog() {
   const [open, setOpen] = useState(false);
@@ -32,6 +32,16 @@ export default function NewProjectDialog() {
     );
   };
 
+  const moveTemplate = (index: number, direction: 'up' | 'down') => {
+    setSelectedTemplateIds(prev => {
+      const arr = [...prev];
+      const swapIdx = direction === 'up' ? index - 1 : index + 1;
+      if (swapIdx < 0 || swapIdx >= arr.length) return prev;
+      [arr[index], arr[swapIdx]] = [arr[swapIdx], arr[index]];
+      return arr;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const selectedOrg = orgs?.find(o => o.id === form.client);
@@ -41,7 +51,7 @@ export default function NewProjectDialog() {
       organisation_id: selectedOrg?.id,
       template_id: selectedTemplateIds[0] || undefined,
     });
-    // Save all templates via join table
+    // Save all templates via join table with sort_order
     if (selectedTemplateIds.length > 0 && project?.id) {
       await setProjectTemplates.mutateAsync({ projectId: project.id, templateIds: selectedTemplateIds });
     }
@@ -88,7 +98,7 @@ export default function NewProjectDialog() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Templates</label>
+            <label className="text-xs font-medium text-muted-foreground">Templates (select & order)</label>
             <div className="border rounded-md p-2 space-y-1 max-h-40 overflow-y-auto">
               {templates?.map(t => (
                 <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted/50 cursor-pointer text-sm">
@@ -99,14 +109,21 @@ export default function NewProjectDialog() {
               {!templates?.length && <p className="text-xs text-muted-foreground p-2">No templates available. Import one first.</p>}
             </div>
             {selectedTemplateIds.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1.5">
-                {selectedTemplateIds.map(id => {
+              <div className="mt-2 space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Template Order (drag or use arrows)</p>
+                {selectedTemplateIds.map((id, idx) => {
                   const t = templates?.find(t => t.id === id);
                   return (
-                    <span key={id} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
-                      {t?.name || id}
-                      <button type="button" onClick={() => toggleTemplate(id)}><X size={10} /></button>
-                    </span>
+                    <div key={id} className="flex items-center gap-1.5 bg-muted/30 border rounded-md px-2 py-1.5 text-sm">
+                      <GripVertical size={12} className="text-muted-foreground" />
+                      <span className="text-xs font-bold text-primary w-5">{idx + 1}.</span>
+                      <span className="flex-1 truncate">{t?.name || id}</span>
+                      <button type="button" onClick={() => moveTemplate(idx, 'up')} disabled={idx === 0}
+                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30"><ArrowUp size={12} /></button>
+                      <button type="button" onClick={() => moveTemplate(idx, 'down')} disabled={idx === selectedTemplateIds.length - 1}
+                        className="p-0.5 rounded hover:bg-muted disabled:opacity-30"><ArrowDown size={12} /></button>
+                      <button type="button" onClick={() => toggleTemplate(id)} className="p-0.5 rounded hover:bg-destructive/10"><X size={12} /></button>
+                    </div>
                   );
                 })}
               </div>
