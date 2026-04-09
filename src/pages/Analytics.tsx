@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import DashboardExport from '@/components/DashboardExport';
 
 const COLORS = ['#0096A6', '#ef4444', '#9ca3af', '#f59e0b'];
 
@@ -87,7 +88,10 @@ export default function Analytics() {
           <h2 className="text-2xl font-bold font-display">Analytics & Trends</h2>
           <p className="text-sm text-muted-foreground">Comprehensive compliance analysis from completed audits</p>
         </div>
-        <ProjectFilter projects={projects} selectedProjectId={selectedProject} onChange={setSelectedProject} />
+        <div className="flex items-center gap-2">
+          <DashboardExport auditMetrics={auditMetrics} trendData={trendData} totals={totals} selectedProject={selectedProject} projects={projects} pageTitle="Analytics" />
+          <ProjectFilter projects={projects} selectedProjectId={selectedProject} onChange={setSelectedProject} />
+        </div>
       </div>
 
       {!hasData ? (
