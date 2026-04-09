@@ -450,31 +450,19 @@ export default function AuditCapture() {
         </select>
 
         {projectId && projectTemplates.length > 0 && (
-          <>
-            <label className="text-xs font-medium text-muted-foreground ml-2">Template:</label>
-            <select
-              value={templateId || ''}
-              onChange={e => {
-                const params = new URLSearchParams();
-                params.set('projectId', projectId);
-                params.set('templateId', e.target.value);
-                navigate(`/audits/capture?${params.toString()}`);
-              }}
-              className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
-            >
-              <option value="">Pick template…</option>
-              {projectTemplates.map(pt => (
-                <option key={pt.template_id} value={pt.template_id}>
-                  {(pt.checklist_templates as any)?.name}
-                </option>
-              ))}
-            </select>
-          </>
+          <div className="flex items-center gap-1 ml-2">
+            <span className="text-xs text-muted-foreground">Templates:</span>
+            {projectTemplates.map((pt, idx) => (
+              <span key={pt.id} className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                {idx + 1}. {(pt.checklist_templates as any)?.name}
+              </span>
+            ))}
+          </div>
         )}
 
-        {projectId && templateId && (() => {
-          const templateAudits = auditInstances?.filter(a => a.template_id === templateId) || [];
-          if (templateAudits.length === 0) return null;
+        {projectId && (() => {
+          const projectAudits = auditInstances || [];
+          if (projectAudits.length === 0) return null;
           return (
             <>
               <label className="text-xs font-medium text-muted-foreground ml-2">Audit:</label>
@@ -483,14 +471,14 @@ export default function AuditCapture() {
                 onChange={e => {
                   const params = new URLSearchParams();
                   params.set('projectId', projectId);
-                  params.set('templateId', templateId);
+                  if (projectTemplates.length > 0) params.set('templateId', projectTemplates[0].template_id);
                   if (e.target.value) params.set('auditId', e.target.value);
                   navigate(`/audits/capture?${params.toString()}`);
                 }}
                 className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
               >
                 <option value="">+ New audit</option>
-                {templateAudits.map(a => (
+                {projectAudits.map(a => (
                   <option key={a.id} value={a.id}>
                     {a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
                   </option>
