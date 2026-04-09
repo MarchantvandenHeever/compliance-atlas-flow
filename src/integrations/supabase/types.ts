@@ -539,18 +539,21 @@ export type Database = {
           created_at: string
           id: string
           project_id: string
+          sort_order: number
           template_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           project_id: string
+          sort_order?: number
           template_id: string
         }
         Update: {
           created_at?: string
           id?: string
           project_id?: string
+          sort_order?: number
           template_id?: string
         }
         Relationships: [
