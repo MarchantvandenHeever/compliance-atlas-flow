@@ -239,10 +239,31 @@ function AuditReviewDetail({
                                   const itemComments = commentsMap[item.id] || [];
                                   const openItemComments = itemComments.filter(c => c.status === 'open');
                                   const resolvedItemComments = itemComments.filter(c => c.status === 'resolved');
+                                  const isItemReviewed = reviewedItemIds.has(item.id);
+
+                                  const handleToggleReviewed = () => {
+                                    if (isItemReviewed) {
+                                      unmarkReviewed.mutate({ auditId: audit.id, checklistItemId: item.id });
+                                    } else {
+                                      markReviewed.mutate({ auditId: audit.id, checklistItemId: item.id });
+                                    }
+                                  };
 
                                   return (
-                                    <div key={item.id} className="rounded-md border bg-background">
+                                    <div key={item.id} className={`rounded-md border bg-background ${isItemReviewed ? 'border-green-300 bg-green-50/30' : ''}`}>
                                       <div className="flex items-start gap-3 px-3 py-2.5">
+                                        {/* Reviewed checkbox */}
+                                        <button
+                                          onClick={handleToggleReviewed}
+                                          className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                            isItemReviewed
+                                              ? 'bg-green-600 border-green-600 text-white'
+                                              : 'border-muted-foreground/40 hover:border-primary'
+                                          }`}
+                                          title={isItemReviewed ? 'Unmark as reviewed' : 'Mark as reviewed'}
+                                        >
+                                          {isItemReviewed && <CheckCircle2 size={12} />}
+                                        </button>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-sm">{item.description}</p>
                                           {response?.comments && (
@@ -256,7 +277,10 @@ function AuditReviewDetail({
                                             </p>
                                           )}
                                         </div>
-                                        <div className="flex-shrink-0">
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          {isItemReviewed && (
+                                            <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded">Reviewed</span>
+                                          )}
                                           {statusLabel(response?.status || null)}
                                         </div>
                                       </div>
