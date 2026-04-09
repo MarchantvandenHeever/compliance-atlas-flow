@@ -171,6 +171,27 @@ export default function AuditCapture() {
     return new Set(items.filter(i => 'objectiveId' in i ? activeObjIds.includes((i as any).objectiveId) : true).map(i => i.id));
   }, [items, sections, objectives, inactiveSections, has3Level]);
 
+  // Build global item number map for active items (sequential numbering for cross-referencing with photos)
+  const itemNumberMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    let num = 1;
+    for (const section of sections.filter(s => !inactiveSections.has(s.id))) {
+      const sectionObjs = objectives.filter(o => o.sectionId === section.id);
+      if (sectionObjs.length > 0) {
+        for (const obj of sectionObjs) {
+          for (const item of items.filter(i => (i as any).objectiveId === obj.id)) {
+            map[item.id] = num++;
+          }
+        }
+      } else {
+        for (const item of items.filter(i => (i as any).sectionId === section.id)) {
+          map[item.id] = num++;
+        }
+      }
+    }
+    return map;
+  }, [items, sections, objectives, inactiveSections]);
+
   const allResponses = useMemo(() => Object.values(responses).filter(r => r.status) as AuditItemResponse[], [responses]);
   const activeResponses = useMemo(() => {
     return Object.entries(responses).filter(([id, r]) => r.status && activeItemIds.has(id)).map(([_, r]) => r) as AuditItemResponse[];
