@@ -34,7 +34,7 @@ export default function Projects() {
       navigate(`/audits/capture?auditId=${result.id}&templateId=${templateId}&projectId=${projectId}`);
     } finally {
       setCreatingAuditFor(null);
-      setSelectingTemplateFor(null);
+      
     }
   };
 
