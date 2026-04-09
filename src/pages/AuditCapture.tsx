@@ -50,7 +50,15 @@ export default function AuditCapture() {
   const { data: reviewComments } = useReviewComments(auditId || undefined);
   const resolveComment = useResolveReviewComment();
   const reopenAudit = useReopenAudit();
+  const updateAuditName = useUpdateAuditName();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
+  const { data: revisionLog } = useRevisionLog(auditId || undefined);
+
+  // Editable audit name
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const auditDisplayName = (currentAuditInstance as any)?.name || '';
+  useEffect(() => { setEditName(auditDisplayName); }, [auditDisplayName]);
   const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
