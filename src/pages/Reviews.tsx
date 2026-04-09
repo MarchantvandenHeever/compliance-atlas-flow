@@ -269,17 +269,31 @@ function AuditReviewDetail({
                                           {isItemReviewed && <CheckCircle2 size={12} />}
                                         </button>
                                         <div className="flex-1 min-w-0">
-                                          <p className="text-sm">{item.description}</p>
-                                          {response?.comments && (
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                              <span className="font-medium">Auditor notes:</span> {response.comments}
-                                            </p>
-                                          )}
-                                          {response?.actions && (
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                              <span className="font-medium">Actions:</span> {response.actions}
-                                            </p>
-                                          )}
+                                          <p className="text-sm font-medium">{item.description}</p>
+                                          {/* Auditor Evidence Section - always visible */}
+                                          <div className="mt-2 rounded-md bg-muted/40 border border-muted px-3 py-2 space-y-1.5">
+                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Auditor Evidence</p>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                              <div>
+                                                <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Comments / Observations</p>
+                                                <p className="text-xs text-foreground">
+                                                  {response?.comments || <span className="italic text-muted-foreground">No comments provided</span>}
+                                                </p>
+                                              </div>
+                                              <div>
+                                                <p className="text-[10px] font-medium text-muted-foreground mb-0.5">Recommended Actions</p>
+                                                <p className="text-xs text-foreground">
+                                                  {response?.actions || <span className="italic text-muted-foreground">No actions specified</span>}
+                                                </p>
+                                              </div>
+                                            </div>
+                                            {/* Photo evidence count */}
+                                            {response?.response_photos && response.response_photos.length > 0 && (
+                                              <p className="text-[10px] text-primary font-medium">
+                                                📷 {response.response_photos.length} photo(s) attached
+                                              </p>
+                                            )}
+                                          </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
                                           {isItemReviewed && (
