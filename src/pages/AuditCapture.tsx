@@ -565,6 +565,37 @@ export default function AuditCapture() {
           <h2 className="text-2xl font-bold font-display">
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
+          {auditId && (
+            <div className="flex items-center gap-2 mt-1">
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="Enter audit name…"
+                    className="h-7 rounded border bg-background px-2 text-sm min-w-[200px]"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        updateAuditName.mutate({ auditId, name: editName });
+                        setIsEditingName(false);
+                      }
+                      if (e.key === 'Escape') { setEditName(auditDisplayName); setIsEditingName(false); }
+                    }}
+                  />
+                  <button onClick={() => { updateAuditName.mutate({ auditId, name: editName }); setIsEditingName(false); }}
+                    className="p-1 rounded hover:bg-muted"><Check size={14} className="text-green-600" /></button>
+                  <button onClick={() => { setEditName(auditDisplayName); setIsEditingName(false); }}
+                    className="p-1 rounded hover:bg-muted"><X size={14} className="text-muted-foreground" /></button>
+                </div>
+              ) : (
+                <button onClick={() => setIsEditingName(true)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                  <span>{auditDisplayName || 'Untitled Audit'}</span>
+                  <Pencil size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}${revisionCount > 0 ? ` • Rev ${revisionCount}` : ''}` : auditId ? `Audit in progress${revisionCount > 0 ? ` (Revision ${revisionCount})` : ''}` : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
