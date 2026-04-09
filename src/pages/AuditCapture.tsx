@@ -292,6 +292,146 @@ export default function AuditCapture() {
 
   // projectTemplates already defined above
 
+  const renderSection = (section: typeof sections[0]) => {
+    const isExpanded = expandedSections.has(section.id);
+    const isSectionInactive = inactiveSections.has(section.id);
+    const sectionObjectives = has3Level
+      ? objectives.filter(o => o.sectionId === section.id)
+      : [{ id: section.id, name: section.name, sectionId: section.id, source: section.source, order: 0 }];
+    const sectionItemCount = sectionObjectives.reduce((acc, obj) => acc + getFilteredItems(obj.id).length, 0);
+    if (sectionItemCount === 0 && (searchQuery || statusFilter !== 'all')) return null;
+    const sectionResponded = sectionObjectives.reduce((acc, obj) => acc + getFilteredItems(obj.id).filter(i => responses[i.id]?.status).length, 0);
+
+    return (
+      <div key={section.id} className={`bg-card border rounded-lg overflow-hidden ${isSectionInactive ? 'opacity-60' : ''}`}>
+        <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/30 transition-colors">
+          <button onClick={() => toggleSection(section.id)} className="flex items-center gap-3 flex-1 text-left">
+            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${section.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'}`}>{section.source}</span>
+            <span className={`text-sm font-semibold flex-1 ${isSectionInactive ? 'line-through text-muted-foreground' : ''}`}>{section.name}</span>
+          </button>
+          {isSectionInactive && <span className="text-[10px] font-medium px-2 py-0.5 rounded bg-amber-100 text-amber-700">Inactive</span>}
+          <span className="text-xs text-muted-foreground">{sectionResponded}/{sectionItemCount}</span>
+          <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${sectionItemCount ? (sectionResponded / sectionItemCount) * 100 : 0}%` }} /></div>
+          {!isLocked && (
+          <button
+            onClick={(e) => { e.stopPropagation(); toggleSectionActive(section.id); }}
+            className={`text-[10px] px-2 py-1 rounded font-medium transition-colors ${isSectionInactive ? 'bg-muted text-muted-foreground hover:bg-primary/10 hover:text-primary' : 'bg-primary/10 text-primary hover:bg-muted hover:text-muted-foreground'}`}
+            title={isSectionInactive ? 'Mark phase as active' : 'Mark phase as inactive'}
+          >
+            {isSectionInactive ? 'Activate' : 'Deactivate'}
+          </button>
+          )}
+        </div>
+        <AnimatePresence>
+          {isExpanded && (
+            <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden">
+              <div className="border-t">
+                {sectionObjectives.map(obj => {
+                  const objItems = getFilteredItems(obj.id);
+                  if (objItems.length === 0) return null;
+                  const isObjExpanded = has3Level ? expandedObjectives.has(obj.id) : true;
+                  return (
+                    <div key={obj.id}>
+                      {has3Level && (
+                        <button onClick={() => toggleObjective(obj.id)} className="w-full flex items-center gap-3 px-6 py-2.5 hover:bg-muted/10 transition-colors text-left border-b bg-muted/5">
+                          {isObjExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                          <span className="text-sm font-medium flex-1 text-foreground/80">{obj.name}</span>
+                          <span className="text-xs text-muted-foreground">{objItems.length} tasks</span>
+                        </button>
+                      )}
+                      {isObjExpanded && (
+                        <div className="divide-y">
+                          {objItems.map(item => {
+                            const response = responses[item.id];
+                            const isRowExpanded = expandedRows.has(item.id);
+                            return (
+                              <div key={item.id} className="group">
+                                <div className="flex items-start gap-2 px-4 py-3 hover:bg-muted/20">
+                                  <span className="text-[10px] font-bold text-primary bg-primary/10 rounded px-1 py-0.5 mt-0.5 flex-shrink-0 min-w-[24px] text-center">#{itemNumberMap[item.id]}</span>
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getStatusDotClass(response?.status as ComplianceStatus || null)}`} />
+                                  <span className="text-xs text-muted-foreground w-10 flex-shrink-0 pt-0.5">{item.conditionRef}</span>
+                                  <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
+                                    <span className={`${isRowExpanded ? '' : 'line-clamp-2'}`}>{item.description}</span>
+                                  </button>
+                                  {reviewComments?.some(c => c.checklist_item_id === item.id && c.status === 'reviewed') && (
+                                    <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-0.5">
+                                      <CheckCircle2 size={10} /> Reviewed
+                                    </span>
+                                  )}
+                                  <div className="flex gap-1 flex-shrink-0">
+                                    {STATUS_OPTIONS.map(opt => (
+                                      <button key={opt.value} onClick={() => !isLocked && setStatus(item.id, opt.value)} disabled={isLocked}
+                                        className={`px-2 py-1 rounded text-xs font-medium transition-all ${response?.status === opt.value ? opt.color : 'bg-muted/50 text-muted-foreground hover:bg-muted'} ${isLocked ? 'cursor-not-allowed' : ''}`} title={opt.label}>
+                                        {opt.shortLabel}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                {(() => {
+                                  const itemComments = reviewComments?.filter(c => c.checklist_item_id === item.id && c.status === 'open');
+                                  if (!itemComments?.length) return null;
+                                  return (
+                                    <div className="mx-4 mb-1 mt-0 border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 rounded-md px-3 py-2">
+                                      <div className="flex items-center gap-1.5 mb-1">
+                                        <MessageSquare size={12} className="text-amber-600" />
+                                        <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Reviewer Comments</span>
+                                      </div>
+                                      {itemComments.map(c => (
+                                        <div key={c.id} className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300 mt-1">
+                                          <span className="flex-1">"{c.comment}"</span>
+                                          {!isLocked && (
+                                            <button onClick={() => resolveComment.mutate({ commentId: c.id, auditId: auditId! })}
+                                              className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900 dark:text-green-300 flex-shrink-0">
+                                              <CheckCircle2 size={10} /> Resolve
+                                            </button>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                                <AnimatePresence>
+                                  {isRowExpanded && (
+                                    <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                                      <div className="px-4 pb-3 pl-16 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div>
+                                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Audit Evidence / Comments</label>
+                                          <textarea value={response?.comments || ''} onChange={e => setComment(item.id, e.target.value)} placeholder="Enter audit observations..." rows={3} disabled={isLocked}
+                                            className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Actions / Recommendations</label>
+                                          <textarea value={response?.actions || ''} onChange={e => setAction(item.id, e.target.value)} placeholder="Enter corrective actions..." rows={3} disabled={isLocked}
+                                            className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence (Item #{itemNumberMap[item.id]})</label>
+                                          <PhotoUpload responseId={response?.id || item.id}
+                                            photos={response?.photos?.map(p => ({ id: p.id, url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: (p as any).storagePath || '' })) || []}
+                                            onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: p.id || '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation, storagePath: p.storagePath })))}
+                                            disabled={isLocked} />
+                                        </div>
+                                      </div>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
       {/* Project & Template Navigation */}
