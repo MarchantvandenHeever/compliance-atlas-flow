@@ -274,7 +274,7 @@ export default function AuditCapture() {
     await reopenAudit.mutateAsync({ auditId, reason: reason || undefined });
   };
 
-  const projectTemplates = projectId ? (allPT?.filter(pt => pt.project_id === projectId) || []) : [];
+  // projectTemplates already defined above
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
