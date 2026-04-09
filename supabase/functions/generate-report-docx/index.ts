@@ -787,6 +787,28 @@ Deno.serve(async (req) => {
       children.push(nothingToReport());
     }
 
+    // ── Build item numbering map ──
+    const itemNumberMap = new Map<string, string>();
+    let globalItemNum = 0;
+    for (const section of activeSections) {
+      const sItems = items.filter((i: any) => i.section_id === section.id);
+      for (const item of sItems) {
+        globalItemNum++;
+        itemNumberMap.set(item.id, String(globalItemNum));
+      }
+    }
+
+    // Build photo-to-item reference map
+    const photoItemRefMap = new Map<string, string>();
+    for (const p of photos) {
+      const resp = responses.find((r: any) => r.id === p.responseId);
+      if (resp) {
+        const itemNum = itemNumberMap.get(resp.checklist_item_id);
+        const item = items.find((i: any) => i.id === resp.checklist_item_id);
+        photoItemRefMap.set(p.id, itemNum ? `Item ${itemNum} (${item?.condition_ref || "-"})` : item?.condition_ref || "-");
+      }
+    }
+
     // ── Appendix A ──
     children.push(new Paragraph({ children: [new PageBreak()] }));
     children.push(new Paragraph({
@@ -797,9 +819,9 @@ Deno.serve(async (req) => {
     }));
 
     if (sections.length > 0) {
-      const appCols = [1000, 3200, 1000, 1800, 2026];
+      const appCols = [600, 900, 3100, 1000, 1800, 1626];
       const appRows: TableRow[] = [
-        new TableRow({ children: [headerCell("Ref", appCols[0], TEAL), headerCell("Condition", appCols[1], TEAL), headerCell("Status", appCols[2], TEAL), headerCell("Comments", appCols[3], TEAL), headerCell("Actions", appCols[4], TEAL)] }),
+        new TableRow({ children: [headerCell("#", appCols[0], TEAL), headerCell("Ref", appCols[1], TEAL), headerCell("Condition", appCols[2], TEAL), headerCell("Status", appCols[3], TEAL), headerCell("Comments", appCols[4], TEAL), headerCell("Actions", appCols[5], TEAL)] }),
       ];
 
       for (const section of activeSections) {
@@ -807,7 +829,7 @@ Deno.serve(async (req) => {
         appRows.push(new TableRow({
           children: [
             new TableCell({
-              borders: cellBorders, columnSpan: 5,
+              borders: cellBorders, columnSpan: 6,
               shading: { fill: SLATE, type: ShadingType.CLEAR }, margins: cellMargins,
               width: { size: CONTENT_W, type: WidthType.DXA },
               children: [new Paragraph({ children: [new TextRun({ text: label, font: "Arial", size: 18, bold: true, color: WHITE })] })],
@@ -819,13 +841,15 @@ Deno.serve(async (req) => {
         for (const item of sItems) {
           const resp = responses.find((r: any) => r.checklist_item_id === item.id);
           const st = resp?.status || "-";
+          const num = itemNumberMap.get(item.id) || "-";
           appRows.push(new TableRow({
             children: [
-              dataCell(item.condition_ref || "-", appCols[0]),
-              dataCell(item.description || "-", appCols[1]),
-              dataCell(st, appCols[2], { bold: true, color: statusColor(st) }),
-              dataCell(resp?.comments || "-", appCols[3]),
-              dataCell(resp?.actions || "-", appCols[4]),
+              dataCell(num, appCols[0]),
+              dataCell(item.condition_ref || "-", appCols[1]),
+              dataCell(item.description || "-", appCols[2]),
+              dataCell(st, appCols[3], { bold: true, color: statusColor(st) }),
+              dataCell(resp?.comments || "-", appCols[4]),
+              dataCell(resp?.actions || "-", appCols[5]),
             ],
           }));
         }
@@ -850,18 +874,19 @@ Deno.serve(async (req) => {
     }));
 
     if (photos.length > 0) {
-      const photoCols = [800, 3500, 2700, 2026];
+      const photoCols = [600, 1800, 2600, 2200, 1826];
       children.push(new Table({
         width: { size: CONTENT_W, type: WidthType.DXA },
         columnWidths: photoCols,
         rows: [
-          new TableRow({ children: [headerCell("#", photoCols[0], TEAL), headerCell("Caption", photoCols[1], TEAL), headerCell("GPS Location", photoCols[2], TEAL), headerCell("Date", photoCols[3], TEAL)] }),
+          new TableRow({ children: [headerCell("#", photoCols[0], TEAL), headerCell("Item Ref", photoCols[1], TEAL), headerCell("Caption", photoCols[2], TEAL), headerCell("GPS Location", photoCols[3], TEAL), headerCell("Date", photoCols[4], TEAL)] }),
           ...photos.map((p: any, idx: number) => new TableRow({
             children: [
               dataCell(String(idx + 1), photoCols[0]),
-              dataCell(p.caption || "No caption", photoCols[1]),
-              dataCell(p.gps_location || "N/A", photoCols[2]),
-              dataCell(p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A", photoCols[3]),
+              dataCell(photoItemRefMap.get(p.id) || "-", photoCols[1]),
+              dataCell(p.caption || "No caption", photoCols[2]),
+              dataCell(p.gps_location || "N/A", photoCols[3]),
+              dataCell(p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A", photoCols[4]),
             ],
           })),
         ],
