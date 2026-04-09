@@ -70,11 +70,27 @@ export default function AuditCapture() {
   }, [dbItems]);
 
   const sections = useMemo(() => {
-    if (dbSections?.length) return dbSections.map(s => ({
-      id: s.id, name: s.name, source: s.source as 'EA' | 'EMPr', order: s.sort_order,
+    if (dbSections?.length) {
+      // Sort sections by template order then sort_order within template
+      const templateOrder = new Map(projectTemplates.map((pt, idx) => [pt.template_id, idx]));
+      return dbSections.map(s => ({
+        id: s.id, name: s.name, source: s.source as 'EA' | 'EMPr', order: s.sort_order,
+        templateId: s.template_id,
+        templateOrder: templateOrder.get(s.template_id) ?? 999,
+      })).sort((a, b) => a.templateOrder - b.templateOrder || a.order - b.order);
+    }
+    return defaultTemplate.sections.map(s => ({ ...s, templateId: '', templateOrder: 0 }));
+  }, [dbSections, projectTemplates]);
+
+  // Build template groups for display
+  const templateGroups = useMemo(() => {
+    if (!projectTemplates.length) return [];
+    return projectTemplates.map(pt => ({
+      templateId: pt.template_id,
+      templateName: (pt.checklist_templates as any)?.name || 'Template',
+      sections: sections.filter(s => s.templateId === pt.template_id),
     }));
-    return defaultTemplate.sections;
-  }, [dbSections]);
+  }, [projectTemplates, sections]);
 
   const objectives = useMemo(() => {
     if (dbObjectives?.length) return dbObjectives.map(o => ({
