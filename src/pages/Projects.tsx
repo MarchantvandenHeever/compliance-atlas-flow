@@ -93,34 +93,21 @@ export default function Projects() {
                           Continue Audit <ArrowRight size={14} />
                         </Link>
                       )}
-                      {selectingTemplateFor === project.id ? (
-                        <div className="flex items-center gap-2">
-                          <select
-                            autoFocus
-                            onChange={e => { if (e.target.value) handleStartAudit(project.id, e.target.value); }}
-                            className="h-9 rounded-md border bg-background px-2 text-sm"
-                          >
-                            <option value="">Pick template…</option>
-                            {pts.map(pt => (
-                              <option key={pt.template_id} value={pt.template_id}>
-                                {(pt.checklist_templates as any)?.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button onClick={() => setSelectingTemplateFor(null)} className="text-xs text-muted-foreground">Cancel</button>
-                        </div>
-                      ) : (
+                      {pts.length > 0 ? (
                         <button
-                          onClick={() => {
-                            if (pts.length === 0) { toast.error('Assign templates to this project first.'); return; }
-                            if (pts.length === 1) { handleStartAudit(project.id, pts[0].template_id); return; }
-                            setSelectingTemplateFor(project.id);
-                          }}
+                          onClick={() => handleStartAudit(project.id, pts[0].template_id)}
                           disabled={creatingAuditFor === project.id}
                           className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
                         >
                           {creatingAuditFor === project.id ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />}
                           New Audit
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => toast.error('Assign templates to this project first.')}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md bg-muted text-muted-foreground text-sm font-medium"
+                        >
+                          <PlayCircle size={14} /> New Audit
                         </button>
                       )}
                     </div>
