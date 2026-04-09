@@ -499,6 +499,41 @@ export type Database = {
           },
         ]
       }
+      project_team_members: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          id: string
+          project_id: string
+          project_role: Database["public"]["Enums"]["project_team_role"]
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          project_id: string
+          project_role: Database["public"]["Enums"]["project_team_role"]
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          id?: string
+          project_id?: string
+          project_role?: Database["public"]["Enums"]["project_team_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_team_members_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_templates: {
         Row: {
           created_at: string
@@ -828,9 +863,24 @@ export type Database = {
     }
     Functions: {
       get_user_org: { Args: { _user_id: string }; Returns: string }
+      get_user_projects: {
+        Args: {
+          _role?: Database["public"]["Enums"]["project_team_role"]
+          _user_id: string
+        }
+        Returns: string[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_project_member: {
+        Args: {
+          _project_id: string
+          _role?: Database["public"]["Enums"]["project_team_role"]
           _user_id: string
         }
         Returns: boolean
@@ -850,6 +900,7 @@ export type Database = {
       checklist_source: "EA" | "EMPr"
       compliance_status: "C" | "NC" | "NA"
       project_status: "active" | "completed" | "on_hold"
+      project_team_role: "auditor" | "reviewer" | "client"
       report_review_status:
         | "pending_review"
         | "under_review"
@@ -997,6 +1048,7 @@ export const Constants = {
       checklist_source: ["EA", "EMPr"],
       compliance_status: ["C", "NC", "NA"],
       project_status: ["active", "completed", "on_hold"],
+      project_team_role: ["auditor", "reviewer", "client"],
       report_review_status: [
         "pending_review",
         "under_review",
