@@ -171,7 +171,18 @@ export default function AuditCapture() {
   }, []);
 
   const setStatus = useCallback((itemId: string, status: ComplianceStatus) => {
-    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], status, lastEditedAt: new Date().toISOString() } }));
+    setResponses(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        status,
+        ncSeverity: status === 'NC' ? (prev[itemId]?.ncSeverity || 'medium') : null,
+        lastEditedAt: new Date().toISOString(),
+      },
+    }));
+  }, []);
+  const setNcSeverity = useCallback((itemId: string, severity: NCSeverity) => {
+    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], ncSeverity: severity } }));
   }, []);
   const setComment = useCallback((itemId: string, comments: string) => {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], comments } }));
