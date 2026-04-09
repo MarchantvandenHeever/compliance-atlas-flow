@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           id: string
           last_revised_at: string | null
+          name: string
           period: string
           project_id: string
           revision_count: number
@@ -34,6 +35,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_revised_at?: string | null
+          name?: string
           period: string
           project_id: string
           revision_count?: number
@@ -48,6 +50,7 @@ export type Database = {
           created_at?: string
           id?: string
           last_revised_at?: string | null
+          name?: string
           period?: string
           project_id?: string
           revision_count?: number

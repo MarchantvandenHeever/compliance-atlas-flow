@@ -1,0 +1,1 @@
+ALTER TABLE public.audit_instances ADD COLUMN name text NOT NULL DEFAULT '';

@@ -1,8 +1,8 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History, MessageSquare, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Save, Search, Loader2, Send, Lock, RotateCcw, History, MessageSquare, CheckCircle2, Pencil, Check, X } from 'lucide-react';
 import { useMultiTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
-import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useAuditInstances, useReopenAudit, useRevisionLog } from '@/hooks/useAuditData';
+import { useAuditResponses, useSaveAuditResponses, useAuditSectionOverrides, useSaveAuditSectionOverrides, useCreateAudit, useAuditInstances, useReopenAudit, useRevisionLog, useUpdateAuditName } from '@/hooks/useAuditData';
 import { useSubmitForReview, useReviewComments, useResolveReviewComment } from '@/hooks/useReviewData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
@@ -50,10 +50,17 @@ export default function AuditCapture() {
   const { data: reviewComments } = useReviewComments(auditId || undefined);
   const resolveComment = useResolveReviewComment();
   const reopenAudit = useReopenAudit();
+  const updateAuditName = useUpdateAuditName();
   const { data: auditInstances } = useAuditInstances(projectId || undefined);
   const { data: revisionLog } = useRevisionLog(auditId || undefined);
 
   const currentAuditInstance = auditInstances?.find(a => a.id === auditId);
+
+  // Editable audit name
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editName, setEditName] = useState('');
+  const auditDisplayName = (currentAuditInstance as any)?.name || '';
+  useEffect(() => { setEditName(auditDisplayName); }, [auditDisplayName]);
   const isLocked = currentAuditInstance?.status === 'submitted' || currentAuditInstance?.status === 'approved' || currentAuditInstance?.status === 'under_review';
   const isAmendmentsRequested = currentAuditInstance?.status === 'amendments_requested' as any;
   const revisionCount = (currentAuditInstance as any)?.revision_count || 0;
@@ -480,7 +487,7 @@ export default function AuditCapture() {
                 <option value="">+ New audit</option>
                 {projectAudits.map(a => (
                   <option key={a.id} value={a.id}>
-                    {a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
+                    {(a as any).name || a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
                   </option>
                 ))}
               </select>
@@ -558,6 +565,37 @@ export default function AuditCapture() {
           <h2 className="text-2xl font-bold font-display">
             {currentProject ? currentProject.name : 'Audit Capture'}
           </h2>
+          {auditId && (
+            <div className="flex items-center gap-2 mt-1">
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="Enter audit name…"
+                    className="h-7 rounded border bg-background px-2 text-sm min-w-[200px]"
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        updateAuditName.mutate({ auditId, name: editName });
+                        setIsEditingName(false);
+                      }
+                      if (e.key === 'Escape') { setEditName(auditDisplayName); setIsEditingName(false); }
+                    }}
+                  />
+                  <button onClick={() => { updateAuditName.mutate({ auditId, name: editName }); setIsEditingName(false); }}
+                    className="p-1 rounded hover:bg-muted"><Check size={14} className="text-green-600" /></button>
+                  <button onClick={() => { setEditName(auditDisplayName); setIsEditingName(false); }}
+                    className="p-1 rounded hover:bg-muted"><X size={14} className="text-muted-foreground" /></button>
+                </div>
+              ) : (
+                <button onClick={() => setIsEditingName(true)} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                  <span>{auditDisplayName || 'Untitled Audit'}</span>
+                  <Pencil size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              )}
+            </div>
+          )}
           <p className="text-sm text-muted-foreground">
             {isLocked ? `Submitted${currentAuditInstance?.submitted_at ? ` on ${new Date(currentAuditInstance.submitted_at).toLocaleDateString()}` : ''}${revisionCount > 0 ? ` • Rev ${revisionCount}` : ''}` : auditId ? `Audit in progress${revisionCount > 0 ? ` (Revision ${revisionCount})` : ''}` : projectId ? 'Select a template and start an audit' : 'Demo mode — create audit from Projects to persist'}
           </p>
