@@ -71,9 +71,9 @@ export default function Projects() {
                           'bg-warning/10 text-warning'
                         }`}>{project.status}</span>
                         <span className="text-xs text-muted-foreground">{project.audit_frequency}</span>
-                        {pts.map(pt => (
+                        {pts.map((pt, idx) => (
                           <span key={pt.id} className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                            {(pt.checklist_templates as any)?.name}
+                            {pts.length > 1 ? `${idx + 1}. ` : ''}{(pt.checklist_templates as any)?.name}
                           </span>
                         ))}
                       </div>
