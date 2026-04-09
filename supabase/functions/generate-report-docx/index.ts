@@ -132,7 +132,23 @@ Deno.serve(async (req) => {
       reviewer = "Reviewer",
       projectId,
       auditId,
+      clientLogoUrl,
     } = body;
+
+    // Fetch CES logo
+    const cesLogoUrl = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/branding/ces-logo.png`;
+    let cesLogoBuffer: Uint8Array | null = null;
+    let clientLogoBuffer: Uint8Array | null = null;
+    try {
+      const res = await fetch(cesLogoUrl);
+      if (res.ok) cesLogoBuffer = new Uint8Array(await res.arrayBuffer());
+    } catch { /* ignore */ }
+    if (clientLogoUrl) {
+      try {
+        const res = await fetch(clientLogoUrl);
+        if (res.ok) clientLogoBuffer = new Uint8Array(await res.arrayBuffer());
+      } catch { /* ignore */ }
+    }
 
     // ─── Data Fetching (same as PDF function) ───
     let auditData: any = null;
