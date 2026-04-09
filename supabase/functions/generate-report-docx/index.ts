@@ -322,17 +322,39 @@ Deno.serve(async (req) => {
     const children: any[] = [];
 
     // ── Cover Page ──
-    children.push(new Paragraph({ spacing: { after: 600 }, children: [] }));
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      children: [new TextRun({ text: "CES", font: "Arial", size: 36, bold: true, color: TEAL })],
-    }));
-    children.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 600 },
-      children: [new TextRun({ text: "ENVIRONMENTAL AND SOCIAL ADVISORY SERVICES", font: "Arial", size: 20, color: SLATE })],
-    }));
+    // CES Logo
+    if (cesLogoBuffer) {
+      children.push(new Paragraph({
+        spacing: { after: 200 },
+        children: [new ImageRun({
+          type: "png", data: cesLogoBuffer,
+          transformation: { width: 180, height: 55 },
+          altText: { title: "CES Logo", description: "CES Environmental and Social Advisory Services Logo", name: "ces-logo" },
+        })],
+      }));
+    } else {
+      children.push(new Paragraph({ spacing: { after: 600 }, children: [] }));
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER, spacing: { after: 200 },
+        children: [new TextRun({ text: "CES", font: "Arial", size: 36, bold: true, color: TEAL })],
+      }));
+      children.push(new Paragraph({
+        alignment: AlignmentType.CENTER, spacing: { after: 600 },
+        children: [new TextRun({ text: "ENVIRONMENTAL AND SOCIAL ADVISORY SERVICES", font: "Arial", size: 20, color: SLATE })],
+      }));
+    }
+
+    // Client Logo (right aligned)
+    if (clientLogoBuffer) {
+      children.push(new Paragraph({
+        alignment: AlignmentType.RIGHT, spacing: { after: 200 },
+        children: [new ImageRun({
+          type: "png", data: clientLogoBuffer,
+          transformation: { width: 140, height: 45 },
+          altText: { title: "Client Logo", description: "Client Logo", name: "client-logo" },
+        })],
+      }));
+    }
     children.push(new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { before: 400, after: 200 },
