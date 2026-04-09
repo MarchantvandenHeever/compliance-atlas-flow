@@ -179,6 +179,18 @@ function AuditReviewDetail({
       <div className="bg-card border rounded-lg p-4">
         <h3 className="text-lg font-semibold">{projectName} — {audit.period}</h3>
         <p className="text-sm text-muted-foreground">{audit.type} audit · Submitted {audit.submitted_at ? new Date(audit.submitted_at).toLocaleDateString() : '—'}</p>
+        {/* Review Progress */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${reviewProgress}%` }}
+            />
+          </div>
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            {reviewedItemIds.size}/{totalActiveItems} items reviewed ({reviewProgress}%)
+          </span>
+        </div>
       </div>
 
       {/* Audit Content */}
