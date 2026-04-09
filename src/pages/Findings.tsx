@@ -134,6 +134,22 @@ export default function Findings() {
         </button>
       </div>
 
+      {/* Severity filters */}
+      <div className="flex flex-wrap gap-2">
+        <span className="text-xs font-medium text-muted-foreground self-center mr-1">Severity:</span>
+        {[
+          { key: 'all', label: `All`, cls: 'bg-card border hover:bg-muted/50' },
+          { key: 'high', label: `High (${highCount})`, cls: 'bg-red-100 text-red-800 border-red-300' },
+          { key: 'medium', label: `Medium (${mediumCount})`, cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+          { key: 'low', label: `Low (${lowCount})`, cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+        ].map(s => (
+          <button key={s.key} onClick={() => setFilterSeverity(s.key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${filterSeverity === s.key ? s.cls + ' ring-2 ring-offset-1 ring-primary/30' : 'bg-card border hover:bg-muted/50'}`}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       {/* Findings List */}
       <div className="space-y-3">
         {filtered.map((finding, i) => (
