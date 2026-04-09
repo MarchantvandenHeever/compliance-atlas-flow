@@ -86,6 +86,7 @@ Deno.serve(async (req) => {
     let projectData: any = null;
     let previousAuditData: any = null;
     let previousResponses: any[] = [];
+    let revisionLog: any[] = [];
 
     if (auditId) {
       const { data: audit } = await supabase
@@ -102,6 +103,14 @@ Deno.serve(async (req) => {
         .eq("audit_id", auditId);
       responses = resp || [];
       photos = responses.flatMap((r: any) => (r.response_photos || []).map((p: any) => ({ ...p, responseId: r.id })));
+
+      // Fetch revision log
+      const { data: revLog } = await supabase
+        .from("audit_revision_log")
+        .select("*")
+        .eq("audit_id", auditId)
+        .order("revision_number", { ascending: true });
+      revisionLog = revLog || [];
 
       const { data: sectionOverrides } = await supabase
         .from("audit_section_overrides")
@@ -145,7 +154,7 @@ Deno.serve(async (req) => {
         }
       }
 
-      // ---- Fetch previous audit for the same project ----
+      // Fetch previous audit for the same project
       if (audit?.project_id) {
         const { data: prevAudits } = await supabase
           .from("audit_instances")
@@ -192,7 +201,6 @@ Deno.serve(async (req) => {
     // Previous audit metrics
     let prevCompliant = 0, prevNC = 0, prevNA = 0, prevCompliancePercent = 0;
     if (previousResponses.length > 0) {
-      // Filter to same active items where possible
       const prevActive = previousResponses.filter((r: any) => activeItemIds.has(r.checklist_item_id));
       prevCompliant = prevActive.filter((r: any) => r.status === "C").length;
       prevNC = prevActive.filter((r: any) => r.status === "NC").length;
@@ -209,6 +217,13 @@ Deno.serve(async (req) => {
     const contentW = pageW - margin * 2;
     let pageNum = 0;
 
+    const projName = projectData?.name || "Project";
+    const projClient = projectData?.client || "Client";
+    const projLocation = projectData?.location || "Location";
+    const hasPrevious = !!previousAuditData;
+    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
+    const reviewColor = auditData?.status === "approved" ? GREEN : AMBER;
+
     const addFooter = () => {
       pageNum++;
       doc.setFontSize(8);
@@ -218,23 +233,71 @@ Deno.serve(async (req) => {
       doc.text("CONFIDENTIAL", pageW - margin, pageH - 10, { align: "right" });
     };
 
-    const drawHR = (y: number) => {
+    const drawHR = (yPos: number) => {
       doc.setDrawColor(...TEAL);
       doc.setLineWidth(0.5);
-      doc.line(margin, y, pageW - margin, y);
+      doc.line(margin, yPos, pageW - margin, yPos);
     };
 
-    const ensureSpace = (needed: number): number => {
-      let cy = (doc as any).lastAutoTable?.finalY || 0;
-      if (cy < 30) cy = 30;
-      if (cy > pageH - needed) {
-        doc.addPage();
-        addFooter();
-        doc.setFillColor(...LIGHT_BG);
-        doc.rect(0, 0, pageW, pageH, "F");
+    const newPage = () => {
+      doc.addPage();
+      addFooter();
+      doc.setFillColor(...LIGHT_BG);
+      doc.rect(0, 0, pageW, pageH, "F");
+    };
+
+    const ensureSpace = (needed: number, currentY: number): number => {
+      if (currentY > pageH - needed) {
+        newPage();
         return 30;
       }
-      return cy;
+      return currentY;
+    };
+
+    const sectionHeader = (num: string, title: string, yRef: { y: number }) => {
+      yRef.y = ensureSpace(40, yRef.y);
+      doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
+      doc.text(`${num}. ${title}`, margin, yRef.y); yRef.y += 3; drawHR(yRef.y); yRef.y += 10;
+    };
+
+    const subSectionHeader = (num: string, title: string, yRef: { y: number }) => {
+      yRef.y = ensureSpace(30, yRef.y);
+      doc.setFontSize(13); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+      doc.text(`${num} ${title}`, margin, yRef.y); yRef.y += 8;
+    };
+
+    const subSubHeader = (num: string, title: string, yRef: { y: number }) => {
+      yRef.y = ensureSpace(25, yRef.y);
+      doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+      doc.text(`${num} ${title}`, margin + 5, yRef.y); yRef.y += 7;
+    };
+
+    const bodyText = (text: string, yRef: { y: number }) => {
+      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+      const lines = doc.splitTextToSize(text, contentW);
+      // Check if we need a page break
+      const lineHeight = 5;
+      const totalH = lines.length * lineHeight;
+      if (yRef.y + totalH > pageH - 20) {
+        // Print what fits on current page, then continue
+        for (const line of lines) {
+          if (yRef.y > pageH - 20) {
+            newPage();
+            yRef.y = 30;
+            doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+          }
+          doc.text(line, margin, yRef.y);
+          yRef.y += lineHeight;
+        }
+      } else {
+        doc.text(lines, margin, yRef.y);
+        yRef.y += totalH;
+      }
+      yRef.y += 5;
+    };
+
+    const nothingToReport = (yRef: { y: number }) => {
+      bodyText("Nothing to report.", yRef);
     };
 
     // ==================== COVER PAGE ====================
@@ -265,16 +328,10 @@ Deno.serve(async (req) => {
     doc.text(reportNumber, margin + 10, 112);
 
     // Review status badge
-    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
-    const reviewColor = auditData?.status === "approved" ? GREEN : AMBER;
     doc.setFillColor(...(reviewColor as [number, number, number]));
     doc.roundedRect(margin, 125, contentW, 8, 2, 2, "F");
     doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
     doc.text(reviewStatus, pageW / 2, 130.5, { align: "center" });
-
-    const projName = projectData?.name || "Project";
-    const projClient = projectData?.client || "Client";
-    const projLocation = projectData?.location || "Location";
 
     doc.setFillColor(30, 70, 90);
     doc.rect(margin, 138, contentW, 60, "F");
@@ -299,64 +356,182 @@ Deno.serve(async (req) => {
     doc.setFillColor(...TEAL);
     doc.rect(0, pageH - 8, pageW, 8, "F");
 
-    // ==================== TABLE OF CONTENTS ====================
-    doc.addPage(); addFooter();
-    doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("Table of Contents", margin, 35); drawHR(40);
-
-    const hasPrevious = !!previousAuditData;
-    const tocItems = [
-      { num: "1", title: "Introduction" },
-      { num: "2", title: "Project Description" },
-      { num: "3", title: "Audit Methodology" },
-      { num: "4", title: "Summary of Findings" },
-      { num: "5", title: "Compliance Summary" },
-      ...(hasPrevious ? [{ num: "6", title: "Audit Comparison — Changes from Previous Audit" }] : []),
-      { num: hasPrevious ? "7" : "6", title: "Conclusions and Recommendations" },
-      { num: "A", title: "Appendix A - Full Audit Checklist" },
-      { num: "B", title: "Appendix B - Photo Evidence" },
-    ];
-
-    let tocY = 52;
-    doc.setFontSize(11);
-    for (const item of tocItems) {
-      doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL); doc.text(item.num, margin, tocY);
-      doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE); doc.text(item.title, margin + 12, tocY);
-      doc.setDrawColor(...GREY); doc.setLineDashPattern([1, 1], 0);
-      const tw = doc.getTextWidth(item.title);
-      doc.line(margin + 12 + tw + 3, tocY, pageW - margin - 5, tocY);
-      doc.setLineDashPattern([], 0);
-      tocY += 10;
-    }
-
-    // ==================== SECTION 1: INTRODUCTION ====================
-    doc.addPage(); addFooter();
-    doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
+    // ==================== REVISIONS TRACKING TABLE ====================
+    newPage();
     let y = 30;
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
+    doc.text("Revisions Tracking Table", margin, y); y += 3; drawHR(y); y += 10;
 
-    const sectionHeader = (num: string, title: string) => {
-      if (y > pageH - 40) {
-        doc.addPage(); addFooter();
-        doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-        y = 30;
-      }
-      doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
-      doc.text(`${num}. ${title}`, margin, y); y += 3; drawHR(y); y += 10;
-    };
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text("CES Report Revision and Tracking Schedule", margin, y); y += 10;
 
-    sectionHeader("1", "Introduction");
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-    const introText = `This report presents the findings of the environmental compliance audit conducted for the ${projName} project during the ${period} audit period. The audit was performed in accordance with the conditions of the Environmental Authorisation (EA) and the Environmental Management Programme (EMPr) applicable to the project.\n\nThe purpose of this audit is to assess compliance with the environmental conditions and commitments, identify non-conformances, and recommend corrective actions where necessary.`;
-    const introLines = doc.splitTextToSize(introText, contentW);
-    doc.text(introLines, margin, y); y += introLines.length * 5 + 10;
-
-    // ==================== SECTION 2: PROJECT DESCRIPTION ====================
-    sectionHeader("2", "Project Description");
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    const revTrackingBody: any[] = [
+      ["Document Title:", reportTitle],
+      ["Client Name:", projClient],
+      ["Status:", auditData?.status === "approved" ? "Approved" : "Draft"],
+      ["Issue Date:", new Date().toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })],
+      ["Environmental Control Officer:", author],
+      ["Senior Environmental Control Officer / Reviewer:", reviewer],
+    ];
 
     (doc as any).autoTable({
       startY: y,
+      body: revTrackingBody,
+      theme: "grid",
+      margin: { left: margin, right: margin },
+      bodyStyles: { fontSize: 9, textColor: SLATE },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 65 } },
+      alternateRowStyles: { fillColor: [240, 248, 248] },
+    });
+
+    y = (doc as any).lastAutoTable?.finalY + 15 || y + 15;
+
+    // Revision history
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text("Revision History", margin, y); y += 8;
+
+    if (revisionLog.length > 0) {
+      const revRows = revisionLog.map((r: any) => [
+        `Rev ${r.revision_number}`,
+        new Date(r.revised_at).toLocaleDateString("en-ZA"),
+        r.previous_status,
+        r.reason || "-",
+      ]);
+
+      (doc as any).autoTable({
+        startY: y,
+        head: [["Revision", "Date", "Previous Status", "Reason"]],
+        body: revRows,
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: SLATE },
+        alternateRowStyles: { fillColor: [240, 248, 248] },
+      });
+    } else if (auditData?.revision_count > 0) {
+      (doc as any).autoTable({
+        startY: y,
+        head: [["Version", "Date", "Notes"]],
+        body: [["Version 1", period, "Initial report"]],
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: SLATE },
+      });
+    } else {
+      (doc as any).autoTable({
+        startY: y,
+        head: [["Version", "Date", "Notes"]],
+        body: [["Version 1", period, "Initial report"]],
+        theme: "grid",
+        margin: { left: margin, right: margin },
+        headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+        bodyStyles: { fontSize: 8, textColor: SLATE },
+      });
+    }
+
+    // ==================== THE PROJECT TEAM ====================
+    newPage();
+    y = 30;
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
+    doc.text("The Project Team", margin, y); y += 3; drawHR(y); y += 10;
+
+    const teamBody: any[] = [
+      ["Environmental Control Officer (ECO):", author, "Report Writer"],
+      ["Senior ECO / Reviewer:", reviewer, "Reviewer"],
+    ];
+
+    (doc as any).autoTable({
+      startY: y,
+      head: [["Role", "Name", "Responsibility"]],
+      body: teamBody,
+      theme: "grid",
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: SLATE },
+      alternateRowStyles: { fillColor: [240, 248, 248] },
+    });
+
+    // ==================== TABLE OF CONTENTS ====================
+    newPage();
+    y = 30;
+    doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text("Table of Contents", margin, y); drawHR(y + 5); y += 15;
+
+    const tocItems = [
+      { num: "1", title: "Introduction", indent: 0 },
+      { num: "1.1", title: "Project Description", indent: 1 },
+      { num: "1.2", title: "Authorisation Monitoring and Reporting Requirements", indent: 1 },
+      { num: "1.2.1", title: "Monitoring, Recording and Reporting Requirements", indent: 2 },
+      { num: "1.2.2", title: "Relevant Contact Persons", indent: 2 },
+      { num: "1.2.3", title: "Report Outcome", indent: 2 },
+      { num: "1.2.4", title: "Site Compliance Monitoring", indent: 2 },
+      { num: "1.2.5", title: "Audit Programme", indent: 2 },
+      { num: "2", title: "Environmental Compliance Audit", indent: 0 },
+      { num: "2.1", title: "Audit Methodology", indent: 1 },
+      { num: "2.2", title: "Summary of Audit Findings", indent: 1 },
+      { num: "2.3", title: "Summary of Compliance", indent: 1 },
+      ...(hasPrevious ? [{ num: "2.4", title: "Audit Comparison — Changes from Previous Audit", indent: 1 }] : []),
+      { num: "3", title: "Conclusions and Recommendations", indent: 0 },
+      { num: "3.1", title: "Objectives", indent: 1 },
+      { num: "3.2", title: "General Comments and Observations", indent: 1 },
+      { num: "A", title: "Appendix A — Audit Checklist", indent: 0 },
+      { num: "B", title: "Appendix B — Photo Evidence", indent: 0 },
+    ];
+
+    doc.setFontSize(11);
+    for (const item of tocItems) {
+      const xOff = margin + item.indent * 8;
+      const fontSize = item.indent === 0 ? 11 : item.indent === 1 ? 10 : 9;
+      doc.setFontSize(fontSize);
+      doc.setFont("helvetica", item.indent === 0 ? "bold" : "normal");
+      doc.setTextColor(...TEAL); doc.text(item.num, xOff, y);
+      doc.setTextColor(...SLATE); doc.text(item.title, xOff + (item.indent === 2 ? 12 : 10), y);
+      const tw = doc.getTextWidth(item.title);
+      doc.setDrawColor(...GREY); doc.setLineDashPattern([1, 1], 0);
+      const lineStart = xOff + (item.indent === 2 ? 12 : 10) + tw + 3;
+      if (lineStart < pageW - margin - 5) {
+        doc.line(lineStart, y, pageW - margin - 5, y);
+      }
+      doc.setLineDashPattern([], 0);
+      y += item.indent === 0 ? 9 : 7;
+    }
+
+    // ==================== LIST OF TABLES / FIGURES ====================
+    y += 5;
+    y = ensureSpace(30, y);
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text("List of Tables", margin, y); y += 7;
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    doc.text("Table 2.1: Qualitative indicator of compliance.", margin, y); y += 7;
+    doc.text("Table 2.2: Summary of construction audit findings.", margin, y); y += 7;
+    doc.text("Table 2.3: Compliance breakdown by section.", margin, y); y += 12;
+
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
+    doc.text("List of Figures", margin, y); y += 7;
+    doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    doc.text("Figure 2.1: Compliance distribution chart.", margin, y);
+
+    // ==================== SECTION 1: INTRODUCTION ====================
+    newPage();
+    const yRef = { y: 30 };
+
+    sectionHeader("1", "Introduction", yRef);
+    bodyText(
+      `CES Environmental and Social Advisory Services has been appointed as the Environmental Control Officer (ECO) for the ${projName} project. This report presents the findings of the environmental compliance audit conducted during the ${period} audit period.\n\nThe purpose of this audit is to assess compliance with the conditions of the Environmental Authorisation (EA) and the Environmental Management Programme (EMPr) applicable to the project, identify non-conformances, and recommend corrective actions where necessary.`,
+      yRef
+    );
+
+    // 1.1 Project Description
+    subSectionHeader("1.1", "Project Description", yRef);
+
+    if (projectData?.description) {
+      bodyText(projectData.description, yRef);
+    }
+
+    yRef.y = ensureSpace(60, yRef.y);
+    (doc as any).autoTable({
+      startY: yRef.y,
       head: [["Field", "Detail"]],
       body: [
         ["Project Name", projName],
@@ -364,7 +539,8 @@ Deno.serve(async (req) => {
         ["Location", projLocation],
         ["Audit Period", period],
         ["Audit Type", auditData?.type || "Monthly"],
-        ["Auditor", author],
+        ["Auditor (ECO)", author],
+        ["Reviewer", reviewer],
         ...(auditData?.revision_count > 0 ? [["Revision", `Rev ${auditData.revision_count}`]] : []),
       ],
       theme: "grid",
@@ -374,26 +550,115 @@ Deno.serve(async (req) => {
       alternateRowStyles: { fillColor: [240, 248, 248] },
       columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 } },
     });
+    yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
 
-    // ==================== SECTION 3: METHODOLOGY ====================
-    doc.addPage(); addFooter();
-    doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-    y = 30;
+    // 1.2 Authorisation Monitoring and Reporting Requirements
+    subSectionHeader("1.2", "Authorisation Monitoring and Reporting Requirements", yRef);
+    bodyText(
+      `The Environmental Control Officer (ECO) is required to report on the compliance of the proponent and/or contractor in terms of the Environmental Authorisation (EA), Environmental Management Programme (EMPr), General Authorisation (GA), or any relevant environmental permits and licences.`,
+      yRef
+    );
 
-    sectionHeader("3", "Audit Methodology");
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-    let methodText = `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.\n\nCompliance was rated using the following scale:\n\n• C (Compliant) - The condition has been met\n• NC (Non-Compliant) - The condition has not been met\n• N/A (Not Applicable) - The condition is not applicable to the current phase\n\nThe compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`;
+    // 1.2.1 Monitoring, Recording and Reporting Requirements
+    subSubHeader("1.2.1", "Monitoring, Recording and Reporting Requirements", yRef);
+    bodyText(
+      `The audit was conducted in terms of the monitoring requirements stipulated in the EA and EMPr. The ECO is required to conduct regular site inspections and compliance audits to verify adherence to the authorisation conditions, and to report on any deviations or non-conformances observed during the audit period.`,
+      yRef
+    );
+
+    // 1.2.2 Relevant Contact Persons
+    subSubHeader("1.2.2", "Relevant Contact Persons", yRef);
+    yRef.y = ensureSpace(40, yRef.y);
+    (doc as any).autoTable({
+      startY: yRef.y,
+      head: [["Role", "Name"]],
+      body: [
+        ["ECO (Report Writer)", author],
+        ["Senior ECO (Reviewer)", reviewer],
+        ["Client", projClient],
+      ],
+      theme: "grid",
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: SLATE },
+      alternateRowStyles: { fillColor: [240, 248, 248] },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 55 } },
+    });
+    yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
+
+    // 1.2.3 Report Outcome
+    subSubHeader("1.2.3", "Report Outcome", yRef);
+    const outcomeText = ncCount > 0
+      ? `This audit identified ${ncCount} non-conformance(s) out of ${totalAssessed} assessed conditions, resulting in an overall compliance rate of ${compliancePercent}%.`
+      : totalAssessed > 0
+        ? `This audit found full compliance across all ${totalAssessed} assessed conditions, with an overall compliance rate of ${compliancePercent}%.`
+        : "Nothing to report.";
+    bodyText(outcomeText, yRef);
+
+    // 1.2.4 Site Compliance Monitoring
+    subSubHeader("1.2.4", "Site Compliance Monitoring", yRef);
+    bodyText(
+      `Site compliance monitoring was carried out through visual inspection, documentation review, and engagement with on-site personnel. Compliance was assessed against the conditions of the EA, EMPr, and any other relevant authorisations and permits.`,
+      yRef
+    );
+
+    // 1.2.5 Audit Programme
+    subSubHeader("1.2.5", "Audit Programme", yRef);
+    const auditFreq = projectData?.audit_frequency || auditData?.type || "monthly";
+    bodyText(
+      `The audit programme for this project comprises ${auditFreq} environmental compliance audits. This report constitutes audit ${reportNumber} for the ${period} period.`,
+      yRef
+    );
 
     if (inactiveSections.length > 0) {
       const inactiveNames = inactiveSections.map((s: any) => s.name).join(", ");
-      methodText += `\n\nThe following phase(s) were marked as inactive and were therefore not considered as part of this audit: ${inactiveNames}. Items within inactive phases are excluded from the compliance calculations.`;
+      bodyText(
+        `Note: The following phase(s) were marked as inactive and were therefore not considered as part of this audit: ${inactiveNames}. Items within inactive phases are excluded from the compliance calculations.`,
+        yRef
+      );
     }
 
-    const methodLines = doc.splitTextToSize(methodText, contentW);
-    doc.text(methodLines, margin, y); y += methodLines.length * 5 + 15;
+    // ==================== SECTION 2: ENVIRONMENTAL COMPLIANCE AUDIT ====================
+    newPage();
+    yRef.y = 30;
 
-    // ==================== SECTION 4: SUMMARY OF FINDINGS ====================
-    sectionHeader("4", "Summary of Findings");
+    sectionHeader("2", "Environmental Compliance Audit", yRef);
+
+    // 2.1 Audit Methodology
+    subSectionHeader("2.1", "Audit Methodology", yRef);
+
+    bodyText(
+      `The audit was conducted through a systematic review of the EA conditions and EMPr commitments. Each compliance condition was assessed against site observations, documentation review, and stakeholder engagement.`,
+      yRef
+    );
+
+    bodyText("Table 2.1: Qualitative indicator of compliance.", yRef);
+
+    yRef.y = ensureSpace(40, yRef.y);
+    (doc as any).autoTable({
+      startY: yRef.y,
+      head: [["Rating", "Description"]],
+      body: [
+        ["C (Compliant)", "The condition has been met."],
+        ["NC (Non-Compliant)", "The condition has not been met and requires corrective action."],
+        ["N/A (Not Applicable)", "The condition is not applicable to the current audit period or phase of the project."],
+      ],
+      theme: "grid",
+      margin: { left: margin, right: margin },
+      headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
+      bodyStyles: { fontSize: 9, textColor: SLATE },
+      alternateRowStyles: { fillColor: [240, 248, 248] },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 40 } },
+    });
+    yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
+
+    bodyText(
+      `The compliance percentage is calculated as: Compliant / (Compliant + Non-Compliant) × 100, excluding N/A items from the denominator.`,
+      yRef
+    );
+
+    // 2.2 Summary of Audit Findings
+    subSectionHeader("2.2", "Summary of Audit Findings", yRef);
 
     // Helper to build item table rows
     const buildItemTable = (filteredResponses: any[]) => {
@@ -410,19 +675,17 @@ Deno.serve(async (req) => {
       });
     };
 
-    // 4.1 Non-Compliant Items
+    // 2.2.1 Non-Compliant Items
+    subSubHeader("2.2.1", "Non-Compliant Items", yRef);
+
     const ncResponses = activeResponses.filter((r: any) => r.status === "NC");
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("4.1 Non-Compliant Items", margin, y); y += 8;
-
     if (ncResponses.length > 0) {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text(`A total of ${ncResponses.length} non-conformance(s) were identified during this audit period.`, margin, y);
-      y += 8;
+      bodyText(`A total of ${ncResponses.length} non-conformance(s) were identified during this audit period.`, yRef);
 
+      yRef.y = ensureSpace(30, yRef.y);
       (doc as any).autoTable({
-        startY: y,
-        head: [["Ref", "Condition", "Section", "Comments", "Actions"]],
+        startY: yRef.y,
+        head: [["Ref", "Condition", "Phase", "Comments", "Corrective Actions"]],
         body: buildItemTable(ncResponses),
         theme: "grid",
         margin: { left: margin, right: margin },
@@ -431,27 +694,22 @@ Deno.serve(async (req) => {
         columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
+      yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
     } else {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text("No non-conformances were identified during this audit period.", margin, y);
+      nothingToReport(yRef);
     }
 
-    // 4.2 Compliant Items
-    y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 15 : y + 15;
-    if (y > pageH - 50) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
+    // 2.2.2 Compliant Items
+    subSubHeader("2.2.2", "Compliant Items", yRef);
 
     const cResponses = activeResponses.filter((r: any) => r.status === "C");
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("4.2 Compliant Items", margin, y); y += 8;
-
     if (cResponses.length > 0) {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text(`A total of ${cResponses.length} item(s) were found to be compliant.`, margin, y);
-      y += 8;
+      bodyText(`A total of ${cResponses.length} item(s) were found to be compliant.`, yRef);
 
+      yRef.y = ensureSpace(30, yRef.y);
       (doc as any).autoTable({
-        startY: y,
-        head: [["Ref", "Condition", "Section", "Comments", "Actions"]],
+        startY: yRef.y,
+        head: [["Ref", "Condition", "Phase", "Comments", "Actions"]],
         body: buildItemTable(cResponses),
         theme: "grid",
         margin: { left: margin, right: margin },
@@ -460,27 +718,22 @@ Deno.serve(async (req) => {
         columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
+      yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
     } else {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text("No compliant items recorded.", margin, y);
+      nothingToReport(yRef);
     }
 
-    // 4.3 Not Applicable Items
-    y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 15 : y + 15;
-    if (y > pageH - 50) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
+    // 2.2.3 Not Applicable Items
+    subSubHeader("2.2.3", "Not Applicable Items", yRef);
 
     const naResponses = activeResponses.filter((r: any) => r.status === "NA");
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("4.3 Not Applicable Items", margin, y); y += 8;
-
     if (naResponses.length > 0) {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text(`A total of ${naResponses.length} item(s) were marked as not applicable.`, margin, y);
-      y += 8;
+      bodyText(`A total of ${naResponses.length} item(s) were marked as not applicable to the current audit period.`, yRef);
 
+      yRef.y = ensureSpace(30, yRef.y);
       (doc as any).autoTable({
-        startY: y,
-        head: [["Ref", "Condition", "Section", "Comments", "Actions"]],
+        startY: yRef.y,
+        head: [["Ref", "Condition", "Phase", "Comments", "Actions"]],
         body: buildItemTable(naResponses),
         theme: "grid",
         margin: { left: margin, right: margin },
@@ -489,18 +742,17 @@ Deno.serve(async (req) => {
         columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
+      yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
     } else {
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-      doc.text("No items marked as not applicable.", margin, y);
+      nothingToReport(yRef);
     }
 
-    // ==================== SECTION 5: COMPLIANCE SUMMARY ====================
-    doc.addPage(); addFooter();
-    doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-    y = 30;
+    // 2.3 Summary of Compliance
+    newPage();
+    yRef.y = 30;
+    subSectionHeader("2.3", "Summary of Compliance", yRef);
 
-    sectionHeader("5", "Compliance Summary");
-
+    // Compliance metric cards
     const cardW = contentW / 4 - 3;
     const cards = [
       { label: "Compliance", value: `${compliancePercent}%`, color: TEAL },
@@ -512,16 +764,17 @@ Deno.serve(async (req) => {
     cards.forEach((card, i) => {
       const cx = margin + i * (cardW + 4);
       doc.setFillColor(...(card.color as [number, number, number]));
-      doc.roundedRect(cx, y, cardW, 28, 3, 3, "F");
+      doc.roundedRect(cx, yRef.y, cardW, 28, 3, 3, "F");
       doc.setFontSize(18); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
-      doc.text(card.value, cx + cardW / 2, y + 14, { align: "center" });
+      doc.text(card.value, cx + cardW / 2, yRef.y + 14, { align: "center" });
       doc.setFontSize(8); doc.setFont("helvetica", "normal");
-      doc.text(card.label, cx + cardW / 2, y + 22, { align: "center" });
+      doc.text(card.label, cx + cardW / 2, yRef.y + 22, { align: "center" });
     });
-    y += 40;
+    yRef.y += 40;
 
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("Compliance Breakdown by Section", margin, y); y += 8;
+    // Compliance Breakdown by Section (Table 2.3)
+    doc.setFontSize(10); doc.setFont("helvetica", "italic"); doc.setTextColor(...SLATE);
+    doc.text("Table 2.3: Compliance breakdown by section.", margin, yRef.y); yRef.y += 8;
 
     const sectionStats = sections.map((s: any) => {
       const sectionItems = items.filter((i: any) => i.section_id === s.id);
@@ -536,8 +789,8 @@ Deno.serve(async (req) => {
 
     if (sectionStats.length > 0) {
       (doc as any).autoTable({
-        startY: y,
-        head: [["Section", "Source", "C", "NC", "N/A", "Compliance %"]],
+        startY: yRef.y,
+        head: [["Phase", "Source", "C", "NC", "N/A", "Compliance %"]],
         body: sectionStats,
         theme: "grid",
         margin: { left: margin, right: margin },
@@ -546,13 +799,15 @@ Deno.serve(async (req) => {
         alternateRowStyles: { fillColor: [240, 248, 248] },
         columnStyles: { 0: { cellWidth: 55 }, 5: { fontStyle: "bold", halign: "center" } },
       });
+      yRef.y = (doc as any).lastAutoTable?.finalY + 15 || yRef.y + 15;
+    } else {
+      nothingToReport(yRef);
     }
 
-    y = (doc as any).lastAutoTable?.finalY + 15 || y + 15;
-    if (y > pageH - 80) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
-
-    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-    doc.text("Compliance Distribution", margin, y); y += 8;
+    // Compliance Distribution Chart (Figure 2.1)
+    yRef.y = ensureSpace(80, yRef.y);
+    doc.setFontSize(10); doc.setFont("helvetica", "italic"); doc.setTextColor(...SLATE);
+    doc.text("Figure 2.1: Compliance distribution chart.", margin, yRef.y); yRef.y += 8;
 
     const barH = 12;
     const barMaxW = contentW - 30;
@@ -564,37 +819,32 @@ Deno.serve(async (req) => {
     ];
 
     bars.forEach((bar) => {
-      doc.setFontSize(9); doc.setTextColor(...SLATE); doc.text(bar.label, margin, y + barH / 2 + 1);
+      doc.setFontSize(9); doc.setTextColor(...SLATE); doc.text(bar.label, margin, yRef.y + barH / 2 + 1);
       const w = Math.max((bar.count / total) * barMaxW, 1);
       doc.setFillColor(...(bar.color as [number, number, number]));
-      doc.roundedRect(margin + 20, y, w, barH, 2, 2, "F");
+      doc.roundedRect(margin + 20, yRef.y, w, barH, 2, 2, "F");
       doc.setTextColor(255, 255, 255);
-      if (w > 15) { doc.text(`${bar.count}`, margin + 20 + w / 2, y + barH / 2 + 1, { align: "center" }); }
-      y += barH + 4;
+      if (w > 15) { doc.text(`${bar.count}`, margin + 20 + w / 2, yRef.y + barH / 2 + 1, { align: "center" }); }
+      yRef.y += barH + 4;
     });
 
-    // ==================== SECTION 6 (or 6/7): AUDIT COMPARISON ====================
-    const compSectionNum = hasPrevious ? "6" : null;
-    const conclusionSectionNum = hasPrevious ? "7" : "6";
-
+    // 2.4 Audit Comparison (if previous audit exists)
     if (hasPrevious && previousResponses.length > 0) {
-      doc.addPage(); addFooter();
-      doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-      y = 30;
+      newPage();
+      yRef.y = 30;
 
-      sectionHeader(compSectionNum!, "Audit Comparison — Changes from Previous Audit");
+      subSectionHeader("2.4", "Audit Comparison — Changes from Previous Audit", yRef);
 
-      // Comparison summary
-      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
       const prevPeriod = previousAuditData.period || "Previous";
       const prevDate = previousAuditData.submitted_at ? new Date(previousAuditData.submitted_at).toLocaleDateString("en-ZA") : "N/A";
-      const compText = `This section compares the current audit (${period}) with the previous audit (${prevPeriod}, submitted ${prevDate}) conducted on the same project.`;
-      const compLines = doc.splitTextToSize(compText, contentW);
-      doc.text(compLines, margin, y); y += compLines.length * 5 + 10;
+      bodyText(
+        `This section compares the current audit (${period}) with the previous audit (${prevPeriod}, submitted ${prevDate}) conducted on the same project.`,
+        yRef
+      );
 
-      // Overview comparison table
+      // Overall Metrics Comparison
       doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-      doc.text("Overall Metrics Comparison", margin, y); y += 8;
+      doc.text("Overall Metrics Comparison", margin, yRef.y); yRef.y += 8;
 
       const delta = (curr: number, prev: number) => {
         const d = curr - prev;
@@ -602,7 +852,7 @@ Deno.serve(async (req) => {
       };
 
       (doc as any).autoTable({
-        startY: y,
+        startY: yRef.y,
         head: [["Metric", `Previous (${prevPeriod})`, `Current (${period})`, "Change"]],
         body: [
           ["Compliance %", `${prevCompliancePercent}%`, `${compliancePercent}%`, `${delta(compliancePercent, prevCompliancePercent)}%`],
@@ -617,11 +867,9 @@ Deno.serve(async (req) => {
         alternateRowStyles: { fillColor: [240, 248, 248] },
         columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 }, 3: { fontStyle: "bold", halign: "center" } },
       });
+      yRef.y = (doc as any).lastAutoTable?.finalY + 15;
 
-      y = (doc as any).lastAutoTable?.finalY + 15;
-
-      // Detailed item-level changes
-      // Build a map: checklist_item_id -> { prev status, curr status }
+      // Item-level changes
       const prevMap = new Map<string, string>();
       previousResponses.forEach((r: any) => { prevMap.set(r.checklist_item_id, r.status); });
       const currMap = new Map<string, string>();
@@ -630,7 +878,7 @@ Deno.serve(async (req) => {
       const changedItems: any[] = [];
       const allItemIds = new Set([...prevMap.keys(), ...currMap.keys()]);
       allItemIds.forEach(itemId => {
-        if (!activeItemIds.has(itemId)) return; // only compare active items
+        if (!activeItemIds.has(itemId)) return;
         const prev = prevMap.get(itemId) || "-";
         const curr = currMap.get(itemId) || "-";
         if (prev !== curr) {
@@ -648,18 +896,16 @@ Deno.serve(async (req) => {
         }
       });
 
-      if (y > pageH - 50) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
-
+      yRef.y = ensureSpace(50, yRef.y);
       doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.setTextColor(...SLATE);
-      doc.text("Item-Level Status Changes", margin, y); y += 8;
+      doc.text("Item-Level Status Changes", margin, yRef.y); yRef.y += 8;
 
       if (changedItems.length > 0) {
-        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-        doc.text(`${changedItems.length} item(s) changed status between audits.`, margin, y); y += 8;
+        bodyText(`${changedItems.length} item(s) changed status between audits.`, yRef);
 
         (doc as any).autoTable({
-          startY: y,
-          head: [["Ref", "Condition", "Section", "Previous", "Current", "Comments"]],
+          startY: yRef.y,
+          head: [["Ref", "Condition", "Phase", "Previous", "Current", "Comments"]],
           body: changedItems,
           theme: "grid",
           margin: { left: margin, right: margin },
@@ -669,55 +915,70 @@ Deno.serve(async (req) => {
           didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
         });
 
-        // Highlight newly resolved NCs
         const resolvedNCs = changedItems.filter(r => r[3] === "NC" && r[4] === "C");
         const newNCs = changedItems.filter(r => r[3] !== "NC" && r[4] === "NC");
 
-        y = (doc as any).lastAutoTable?.finalY + 10;
-        if (y > pageH - 40) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
+        yRef.y = (doc as any).lastAutoTable?.finalY + 10;
+        yRef.y = ensureSpace(40, yRef.y);
 
-        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
         if (resolvedNCs.length > 0) {
-          doc.text(`• ${resolvedNCs.length} previously non-compliant item(s) are now compliant.`, margin, y); y += 6;
+          bodyText(`• ${resolvedNCs.length} previously non-compliant item(s) are now compliant.`, yRef);
         }
         if (newNCs.length > 0) {
-          doc.text(`• ${newNCs.length} new non-conformance(s) identified since the previous audit.`, margin, y); y += 6;
+          bodyText(`• ${newNCs.length} new non-conformance(s) identified since the previous audit.`, yRef);
         }
         if (resolvedNCs.length === 0 && newNCs.length === 0) {
-          doc.text("Status changes did not involve NC transitions.", margin, y); y += 6;
+          bodyText("Status changes did not involve NC transitions.", yRef);
         }
       } else {
-        doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
-        doc.text("No item-level status changes were detected between the current and previous audit.", margin, y);
+        nothingToReport(yRef);
       }
     }
 
-    // ==================== CONCLUSIONS ====================
-    y = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 15 : y + 15;
-    if (y > pageH - 60) { doc.addPage(); addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); y = 30; }
+    // ==================== SECTION 3: CONCLUSIONS AND RECOMMENDATIONS ====================
+    newPage();
+    yRef.y = 30;
 
-    sectionHeader(conclusionSectionNum, "Conclusions and Recommendations");
-    doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(...SLATE);
+    sectionHeader("3", "Conclusions and Recommendations", yRef);
 
-    let conclusionText = ncCount > 0
-      ? `The audit identified ${ncCount} non-conformance(s) during the ${period} audit period, resulting in an overall compliance rate of ${compliancePercent}%. It is recommended that the identified non-conformances be addressed within the stipulated timeframes and that corrective actions be implemented and verified during the next audit cycle.`
-      : `The audit found full compliance during the ${period} audit period, with an overall compliance rate of ${compliancePercent}%. It is recommended that the current environmental management practices be maintained and that ongoing monitoring continues as per the EMPr requirements.`;
+    // 3.1 Objectives
+    subSectionHeader("3.1", "Objectives", yRef);
+    bodyText(
+      `The objective of this audit was to assess the level of environmental compliance of the ${projName} project against the conditions stipulated in the EA and EMPr during the ${period} audit period. The audit further aimed to identify areas of non-compliance and recommend appropriate corrective actions to improve environmental performance.`,
+      yRef
+    );
 
-    if (hasPrevious) {
-      const trend = compliancePercent > prevCompliancePercent ? "improved" : compliancePercent < prevCompliancePercent ? "declined" : "remained unchanged";
-      conclusionText += `\n\nCompared to the previous audit (${previousAuditData.period}), overall compliance has ${trend} (${prevCompliancePercent}% → ${compliancePercent}%).`;
+    // 3.2 General Comments and Observations
+    subSectionHeader("3.2", "General Comments and Observations", yRef);
+
+    if (ncCount > 0) {
+      let conclusionText = `The audit identified ${ncCount} non-conformance(s) during the ${period} audit period, resulting in an overall compliance rate of ${compliancePercent}%. It is recommended that the identified non-conformances be addressed within the stipulated timeframes and that corrective actions be implemented and verified during the next audit cycle.`;
+
+      if (hasPrevious) {
+        const trend = compliancePercent > prevCompliancePercent ? "improved" : compliancePercent < prevCompliancePercent ? "declined" : "remained unchanged";
+        conclusionText += `\n\nCompared to the previous audit (${previousAuditData.period}), overall compliance has ${trend} (${prevCompliancePercent}% → ${compliancePercent}%).`;
+      }
+
+      bodyText(conclusionText, yRef);
+    } else if (totalAssessed > 0) {
+      let conclusionText = `The audit found full compliance during the ${period} audit period, with an overall compliance rate of ${compliancePercent}%. It is recommended that the current environmental management practices be maintained and that ongoing monitoring continues as per the EMPr requirements.`;
+
+      if (hasPrevious) {
+        const trend = compliancePercent > prevCompliancePercent ? "improved" : compliancePercent < prevCompliancePercent ? "declined" : "remained unchanged";
+        conclusionText += `\n\nCompared to the previous audit (${previousAuditData.period}), overall compliance has ${trend} (${prevCompliancePercent}% → ${compliancePercent}%).`;
+      }
+
+      bodyText(conclusionText, yRef);
+    } else {
+      nothingToReport(yRef);
     }
 
-    const concLines = doc.splitTextToSize(conclusionText, contentW);
-    doc.text(concLines, margin, y);
-
     // ==================== APPENDIX A: FULL CHECKLIST ====================
-    doc.addPage(); addFooter();
-    doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-    y = 30;
+    newPage();
+    yRef.y = 30;
 
     doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
-    doc.text("Appendix A - Full Audit Checklist", margin, y); y += 3; drawHR(y); y += 10;
+    doc.text("Appendix A — Audit Checklist", margin, yRef.y); yRef.y += 3; drawHR(yRef.y); yRef.y += 10;
 
     const checklistRows: any[] = [];
     for (const section of sections) {
@@ -746,7 +1007,7 @@ Deno.serve(async (req) => {
 
     if (checklistRows.length > 0) {
       (doc as any).autoTable({
-        startY: y,
+        startY: yRef.y,
         head: [["Ref", "Condition", "Status", "Comments", "Actions"]],
         body: checklistRows,
         theme: "grid",
@@ -758,19 +1019,17 @@ Deno.serve(async (req) => {
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
-      doc.setFontSize(10); doc.setTextColor(...SLATE);
-      doc.text("No checklist data available for this audit.", margin, y);
+      bodyText("No checklist data available for this audit.", yRef);
     }
 
     // ==================== APPENDIX B: PHOTO EVIDENCE ====================
+    newPage();
+    yRef.y = 30;
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
+    doc.text("Appendix B — Photo Evidence", margin, yRef.y); yRef.y += 3; drawHR(yRef.y); yRef.y += 10;
+
     if (photos.length > 0) {
-      doc.addPage(); addFooter();
-      doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F");
-      y = 30;
-
-      doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.setTextColor(...TEAL);
-      doc.text("Appendix B - Photo Evidence", margin, y); y += 3; drawHR(y); y += 10;
-
       const photoRows = photos.map((p: any, idx: number) => [
         String(idx + 1),
         p.caption || "No caption",
@@ -779,7 +1038,7 @@ Deno.serve(async (req) => {
       ]);
 
       (doc as any).autoTable({
-        startY: y,
+        startY: yRef.y,
         head: [["#", "Caption", "GPS Location", "Date"]],
         body: photoRows,
         theme: "grid",
@@ -788,6 +1047,8 @@ Deno.serve(async (req) => {
         bodyStyles: { fontSize: 8, textColor: SLATE },
         alternateRowStyles: { fillColor: [240, 248, 248] },
       });
+    } else {
+      nothingToReport(yRef);
     }
 
     const pdfBytes = doc.output("arraybuffer");
