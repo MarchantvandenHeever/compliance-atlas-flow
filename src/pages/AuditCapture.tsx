@@ -202,7 +202,7 @@ export default function AuditCapture() {
         // Update URL with new auditId so subsequent saves use it
         const params = new URLSearchParams(searchParams);
         params.set('auditId', currentAuditId);
-        navigate(`/audit?${params.toString()}`, { replace: true });
+        navigate(`/audits/capture?${params.toString()}`, { replace: true });
       } catch {
         return; // error toast already shown by useCreateAudit
       }
@@ -249,8 +249,8 @@ export default function AuditCapture() {
         <select
           value={projectId || ''}
           onChange={e => {
-            if (e.target.value) navigate(`/audit?projectId=${e.target.value}`);
-            else navigate('/audit');
+            if (e.target.value) navigate(`/audits/capture?projectId=${e.target.value}`);
+            else navigate('/audits');
           }}
           className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
         >
@@ -267,7 +267,7 @@ export default function AuditCapture() {
                 const params = new URLSearchParams();
                 params.set('projectId', projectId);
                 params.set('templateId', e.target.value);
-                navigate(`/audit?${params.toString()}`);
+                navigate(`/audits/capture?${params.toString()}`);
               }}
               className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
             >
@@ -294,7 +294,7 @@ export default function AuditCapture() {
                   params.set('projectId', projectId);
                   params.set('templateId', templateId);
                   if (e.target.value) params.set('auditId', e.target.value);
-                  navigate(`/audit?${params.toString()}`);
+                  navigate(`/audits/capture?${params.toString()}`);
                 }}
                 className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
               >

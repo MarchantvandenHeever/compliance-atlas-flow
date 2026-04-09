@@ -9,6 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import AuditCapture from "@/pages/AuditCapture";
+import Audits from "@/pages/Audits";
 import Findings from "@/pages/Findings";
 import Analytics from "@/pages/Analytics";
 import Reports from "@/pages/Reports";
@@ -39,6 +40,8 @@ const App = () => (
                     <Routes>
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/projects" element={<Projects />} />
+                      <Route path="/audits" element={<Audits />} />
+                      <Route path="/audits/capture" element={<AuditCapture />} />
                       <Route path="/audit" element={<AuditCapture />} />
                       <Route path="/findings" element={<Findings />} />
                       <Route path="/analytics" element={<Analytics />} />

@@ -30,7 +30,7 @@ export default function Projects() {
         period,
         type: 'monthly',
       });
-      navigate(`/audit?auditId=${result.id}&templateId=${templateId}&projectId=${projectId}`);
+      navigate(`/audits/capture?auditId=${result.id}&templateId=${templateId}&projectId=${projectId}`);
     } finally {
       setCreatingAuditFor(null);
       setSelectingTemplateFor(null);
@@ -86,7 +86,7 @@ export default function Projects() {
 
                     <div className="flex items-center gap-3">
                       {latestAudit && (
-                        <Link to={`/audit?auditId=${latestAudit.id}&templateId=${latestAudit.template_id}&projectId=${project.id}`}
+                        <Link to={`/audits/capture?auditId=${latestAudit.id}&templateId=${latestAudit.template_id}&projectId=${project.id}`}
                           className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
                           Continue Audit <ArrowRight size={14} />
                         </Link>
@@ -130,7 +130,7 @@ export default function Projects() {
                     <div className="flex items-center gap-4 text-xs">
                       <span className="text-muted-foreground font-medium">Recent Audits:</span>
                       {projectAudits.slice(0, 3).map(a => (
-                        <Link key={a.id} to={`/audit?auditId=${a.id}&templateId=${a.template_id}&projectId=${project.id}`}
+                        <Link key={a.id} to={`/audits/capture?auditId=${a.id}&templateId=${a.template_id}&projectId=${project.id}`}
                           className="flex items-center gap-1.5 hover:text-primary transition-colors">
                           <Activity size={12} className="text-primary" />
                           <span>{a.period}</span>
@@ -149,7 +149,7 @@ export default function Projects() {
           })}
           {!projects?.length && (
             <div className="text-center text-xs text-muted-foreground pt-2">
-              <Link to="/audit" className="text-primary hover:underline">Open demo audit capture →</Link>
+              <Link to="/audits" className="text-primary hover:underline">Open audits →</Link>
             </div>
           )}
         </div>

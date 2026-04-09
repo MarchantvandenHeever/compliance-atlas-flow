@@ -109,7 +109,7 @@ export default function Dashboard() {
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Link to="/audit" className="bg-card border rounded-lg p-4 hover:border-primary/40 transition-colors group">
+        <Link to="/audits" className="bg-card border rounded-lg p-4 hover:border-primary/40 transition-colors group">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary"><ClipboardCheck size={20} /></div>
             <div>
@@ -154,7 +154,7 @@ export default function Dashboard() {
               };
               return (
                 <Link key={audit.id}
-                  to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
+                   to={`/audits/capture?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
                   className="flex items-center gap-4 px-4 py-3 hover:bg-muted/20 transition-colors group">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
