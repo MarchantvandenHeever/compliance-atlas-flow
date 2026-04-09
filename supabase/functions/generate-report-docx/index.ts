@@ -626,9 +626,19 @@ Deno.serve(async (req) => {
     // 2.2.1 Non-Compliant
     children.push(subSubSection("2.2.1", "Non-Compliant Items"));
     const ncResp = activeResponses.filter((r: any) => r.status === "NC");
+    // Sort NC items by severity: high → medium → low
+    const sevOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    ncResp.sort((a: any, b: any) => (sevOrder[a.nc_severity || "medium"] || 1) - (sevOrder[b.nc_severity || "medium"] || 1));
+
     if (ncResp.length > 0) {
-      children.push(bodyPara(`A total of ${ncResp.length} non-conformance(s) were identified during this audit period.`));
-      children.push(buildFindingsTable(ncResp, RED));
+      const highCount = ncResp.filter((r: any) => r.nc_severity === "high").length;
+      const medCount = ncResp.filter((r: any) => !r.nc_severity || r.nc_severity === "medium").length;
+      const lowCount = ncResp.filter((r: any) => r.nc_severity === "low").length;
+      children.push(bodyPara(`A total of ${ncResp.length} non-conformance(s) were identified during this audit period${highCount ? ` (${highCount} high severity)` : ""}.`));
+      if (highCount || medCount || lowCount) {
+        children.push(bodyPara(`Severity breakdown: High: ${highCount}, Medium: ${medCount}, Low: ${lowCount}`));
+      }
+      children.push(buildFindingsTable(ncResp, RED, true));
     } else {
       children.push(nothingToReport());
     }
