@@ -540,6 +540,12 @@ export default function AuditCapture() {
                                         <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
                                           <span className={`${isRowExpanded ? '' : 'line-clamp-2'}`}>{item.description}</span>
                                         </button>
+                                        {/* Reviewed flag */}
+                                        {reviewComments?.some(c => c.checklist_item_id === item.id && c.status === 'reviewed') && (
+                                          <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-0.5">
+                                            <CheckCircle2 size={10} /> Reviewed
+                                          </span>
+                                        )}
                                         <div className="flex gap-1 flex-shrink-0">
                                           {STATUS_OPTIONS.map(opt => (
                                             <button key={opt.value} onClick={() => !isLocked && setStatus(item.id, opt.value)} disabled={isLocked}
