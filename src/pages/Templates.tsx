@@ -283,32 +283,62 @@ export default function Templates() {
           </div>
 
           <div className="divide-y">
-            {dbSections.filter(p => !/all\s*conditions/i.test(p.name)).map(phase => {
+            {dbSections.filter(p => !/all\s*conditions/i.test(p.name)).map((phase, phaseIdx, filteredSections) => {
               const phaseObjectives = dbObjectives?.filter(o => o.section_id === phase.id) || [];
               const isPhaseExpanded = expandedPhases.has(phase.id);
               const phaseItemCount = phaseObjectives.reduce((acc, obj) => {
                 return acc + (dbItems?.filter(i => i.objective_id === obj.id).length || 0);
               }, 0);
 
+              const handleMoveSection = (dir: 'up' | 'down') => {
+                const swapIdx = dir === 'up' ? phaseIdx - 1 : phaseIdx + 1;
+                if (swapIdx < 0 || swapIdx >= filteredSections.length) return;
+                const updates = [
+                  { id: phase.id, sort_order: filteredSections[swapIdx].sort_order },
+                  { id: filteredSections[swapIdx].id, sort_order: phase.sort_order },
+                ];
+                reorderSections.mutate(updates);
+              };
+
               return (
                 <div key={phase.id}>
-                  <button onClick={() => togglePhase(phase.id)}
-                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors text-left">
-                    {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                      phase.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'
-                    }`}>{phase.source}</span>
-                    <span className="text-sm font-semibold flex-1">{phase.name}</span>
+                  <div className="w-full flex items-center gap-3 px-5 py-3 hover:bg-muted/20 transition-colors">
+                    <button onClick={() => togglePhase(phase.id)} className="flex items-center gap-3 flex-1 text-left">
+                      {isPhaseExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        phase.source === 'EA' ? 'bg-primary/10 text-primary' : 'bg-secondary text-secondary-foreground'
+                      }`}>{phase.source}</span>
+                      <span className="text-sm font-semibold flex-1">{phase.name}</span>
+                    </button>
                     <span className="text-xs text-muted-foreground">{phaseObjectives.length} obj • {phaseItemCount} tasks</span>
-                  </button>
+                    <button onClick={() => handleMoveSection('up')} disabled={phaseIdx === 0 || reorderSections.isPending}
+                      className="p-1 rounded hover:bg-muted disabled:opacity-30"><ArrowUp size={12} /></button>
+                    <button onClick={() => handleMoveSection('down')} disabled={phaseIdx === filteredSections.length - 1 || reorderSections.isPending}
+                      className="p-1 rounded hover:bg-muted disabled:opacity-30"><ArrowDown size={12} /></button>
+                  </div>
 
                   {isPhaseExpanded && (
                     <div className="pl-8 divide-y border-t">
-                      {phaseObjectives.map(obj => (
-                          <div key={obj.id} className="px-5 py-2.5">
-                            <span className="text-sm font-medium text-foreground/80">{obj.name}</span>
+                      {phaseObjectives.map((obj, objIdx) => {
+                        const handleMoveObj = (dir: 'up' | 'down') => {
+                          const swapIdx = dir === 'up' ? objIdx - 1 : objIdx + 1;
+                          if (swapIdx < 0 || swapIdx >= phaseObjectives.length) return;
+                          const updates = [
+                            { id: obj.id, sort_order: phaseObjectives[swapIdx].sort_order },
+                            { id: phaseObjectives[swapIdx].id, sort_order: obj.sort_order },
+                          ];
+                          reorderObjectives.mutate(updates);
+                        };
+                        return (
+                          <div key={obj.id} className="px-5 py-2.5 flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground/80 flex-1">{obj.name}</span>
+                            <button onClick={() => handleMoveObj('up')} disabled={objIdx === 0 || reorderObjectives.isPending}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"><ArrowUp size={11} /></button>
+                            <button onClick={() => handleMoveObj('down')} disabled={objIdx === phaseObjectives.length - 1 || reorderObjectives.isPending}
+                              className="p-0.5 rounded hover:bg-muted disabled:opacity-30"><ArrowDown size={11} /></button>
                           </div>
-                        ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
