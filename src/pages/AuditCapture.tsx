@@ -534,6 +534,7 @@ export default function AuditCapture() {
                                   return (
                                     <div key={item.id} className="group">
                                       <div className="flex items-start gap-2 px-4 py-3 hover:bg-muted/20">
+                                        <span className="text-[10px] font-bold text-primary bg-primary/10 rounded px-1 py-0.5 mt-0.5 flex-shrink-0 min-w-[24px] text-center">#{itemNumberMap[item.id]}</span>
                                         <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getStatusDotClass(response?.status as ComplianceStatus || null)}`} />
                                         <span className="text-xs text-muted-foreground w-10 flex-shrink-0 pt-0.5">{item.conditionRef}</span>
                                         <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
