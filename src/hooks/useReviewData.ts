@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getProjectReviewers } from '@/hooks/useProjectTeam';
 import { toast } from 'sonner';
 
 export function useReviewComments(auditId?: string) {
@@ -78,15 +79,29 @@ export function useSubmitForReview() {
         .eq('id', auditId);
       if (error) throw error;
 
-      // Create notifications for all reviewers
-      const { data: reviewers } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', 'reviewer');
+      // Get project_id from audit to find assigned reviewers
+      const { data: auditData } = await supabase
+        .from('audit_instances')
+        .select('project_id')
+        .eq('id', auditId)
+        .single();
 
-      if (reviewers?.length) {
-        const notifications = reviewers.map(r => ({
-          user_id: r.user_id,
+      // Notify project-assigned reviewers first, fallback to all reviewers
+      let reviewerIds: string[] = [];
+      if (auditData?.project_id) {
+        reviewerIds = await getProjectReviewers(auditData.project_id);
+      }
+      if (!reviewerIds.length) {
+        const { data: allReviewers } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'reviewer');
+        reviewerIds = allReviewers?.map(r => r.user_id) || [];
+      }
+
+      if (reviewerIds.length) {
+        const notifications = reviewerIds.map(uid => ({
+          user_id: uid,
           type: 'review_requested',
           audit_id: auditId,
           message: 'A new audit has been submitted for your review.',

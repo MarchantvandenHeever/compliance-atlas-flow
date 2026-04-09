@@ -6,6 +6,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useAuditInstances, useCreateAudit } from '@/hooks/useAuditData';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import NewProjectDialog from '@/components/NewProjectDialog';
+import ProjectTeamPanel from '@/components/ProjectTeamPanel';
 import { toast } from 'sonner';
 
 export default function Projects() {
@@ -85,6 +86,7 @@ export default function Projects() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                      <ProjectTeamPanel projectId={project.id} projectName={project.name} />
                       {latestAudit && (
                         <Link to={`/audits/capture?auditId=${latestAudit.id}&templateId=${latestAudit.template_id}&projectId=${project.id}`}
                           className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 font-medium transition-colors">
