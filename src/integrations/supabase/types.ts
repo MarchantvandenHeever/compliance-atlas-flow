@@ -87,6 +87,7 @@ export type Database = {
           id: string
           last_edited_at: string
           last_edited_by: string | null
+          nc_severity: Database["public"]["Enums"]["action_severity"] | null
           status: Database["public"]["Enums"]["compliance_status"] | null
         }
         Insert: {
@@ -98,6 +99,7 @@ export type Database = {
           id?: string
           last_edited_at?: string
           last_edited_by?: string | null
+          nc_severity?: Database["public"]["Enums"]["action_severity"] | null
           status?: Database["public"]["Enums"]["compliance_status"] | null
         }
         Update: {
@@ -109,6 +111,7 @@ export type Database = {
           id?: string
           last_edited_at?: string
           last_edited_by?: string | null
+          nc_severity?: Database["public"]["Enums"]["action_severity"] | null
           status?: Database["public"]["Enums"]["compliance_status"] | null
         }
         Relationships: [
