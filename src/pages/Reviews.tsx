@@ -139,6 +139,10 @@ function AuditReviewDetail({
   };
 
   const handleApprove = async () => {
+    const unreviewedCount = totalActiveItems - reviewedItemIds.size;
+    if (unreviewedCount > 0) {
+      if (!confirm(`${unreviewedCount} item(s) have not been marked as reviewed. Approve anyway?`)) return;
+    }
     const openCount = reviewComments?.filter(c => c.status === 'open').length || 0;
     if (openCount > 0) {
       if (!confirm(`There are ${openCount} unresolved comment(s). Approve anyway?`)) return;
