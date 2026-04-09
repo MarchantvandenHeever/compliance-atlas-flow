@@ -53,14 +53,15 @@ export default function Reports() {
     }
   };
 
-  const generatePDF = async (audit: typeof completedAudits[0]) => {
+  const generateReport = async (audit: typeof completedAudits[0], format: 'pdf' | 'docx') => {
     setGenerating(audit.id);
     try {
       const project = projects?.find(p => p.id === audit.project_id);
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-      const url = `https://${projectId}.supabase.co/functions/v1/generate-report`;
+      const functionName = format === 'docx' ? 'generate-report-docx' : 'generate-report';
+      const url = `https://${projectId}.supabase.co/functions/v1/${functionName}`;
 
       const reqBody: any = {
         reportTitle: `${project?.name || 'Audit'} - ${audit.period}`,
@@ -71,7 +72,7 @@ export default function Reports() {
         auditId: audit.id,
         projectId: audit.project_id,
       };
-      if (clientLogoUrl) reqBody.clientLogoUrl = clientLogoUrl;
+      if (clientLogoUrl && format === 'pdf') reqBody.clientLogoUrl = clientLogoUrl;
 
       const response = await fetch(url, {
         method: 'POST',
@@ -92,14 +93,15 @@ export default function Reports() {
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `CES_Audit_${audit.period.replace(/\s/g, '_')}.pdf`;
+      const ext = format === 'docx' ? 'docx' : 'pdf';
+      a.download = `CES_Audit_${audit.period.replace(/\s/g, '_')}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
-      toast.success('Report downloaded successfully');
+      toast.success(`${format.toUpperCase()} report downloaded successfully`);
     } catch (err: any) {
-      console.error('PDF generation error:', err);
+      console.error('Report generation error:', err);
       toast.error(err.message || 'Failed to generate report');
     } finally {
       setGenerating(null);
