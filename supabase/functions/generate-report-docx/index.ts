@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   Header, Footer, AlignmentType, HeadingLevel, BorderStyle, WidthType,
-  ShadingType, PageNumber, PageBreak, LevelFormat,
+  ShadingType, PageNumber, PageBreak, LevelFormat, ImageRun,
 } from "docx";
 
 const corsHeaders = {
