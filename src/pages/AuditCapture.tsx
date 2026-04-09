@@ -121,6 +121,7 @@ export default function AuditCapture() {
         const status = r.status === 'NA' ? 'N/A' : r.status;
         mapped[r.checklist_item_id] = {
           id: r.id, status: status as ComplianceStatus, comments: r.comments || '', actions: r.actions || '',
+          ncSeverity: (r as any).nc_severity || null,
           photos: r.response_photos?.map((p: any) => ({ id: p.id, url: '', caption: p.caption || '', timestamp: p.upload_date, gpsLocation: p.gps_location, storagePath: p.storage_path || '' })) || [],
         };
       });
