@@ -1018,6 +1018,28 @@ Deno.serve(async (req) => {
       nothingToReport(yRef);
     }
 
+    // ── Build item numbering map ──
+    const itemNumberMap = new Map<string, string>();
+    let globalItemNum = 0;
+    for (const section of activeSections) {
+      const sectionItems2 = items.filter((i: any) => i.section_id === section.id);
+      for (const item of sectionItems2) {
+        globalItemNum++;
+        itemNumberMap.set(item.id, String(globalItemNum));
+      }
+    }
+
+    // Build photo-to-item reference map
+    const photoItemRefMap = new Map<string, string>();
+    for (const p of photos) {
+      const resp = responses.find((r: any) => r.id === p.responseId);
+      if (resp) {
+        const itemNum = itemNumberMap.get(resp.checklist_item_id);
+        const item = items.find((i: any) => i.id === resp.checklist_item_id);
+        photoItemRefMap.set(p.id, itemNum ? `Item ${itemNum} (${item?.condition_ref || "-"})` : item?.condition_ref || "-");
+      }
+    }
+
     // ==================== APPENDIX A: FULL CHECKLIST ====================
     newPage();
     yRef.y = 30;
@@ -1029,7 +1051,7 @@ Deno.serve(async (req) => {
     for (const section of activeSections) {
       const sectionLabel = `${section.source} - ${section.name}`;
       checklistRows.push([
-        { content: sectionLabel, colSpan: 5, styles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
+        { content: sectionLabel, colSpan: 6, styles: { fillColor: SLATE, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 } },
       ]);
 
       const sectionItems = items.filter((i: any) => i.section_id === section.id);
@@ -1037,7 +1059,9 @@ Deno.serve(async (req) => {
         const response = responses.find((r: any) => r.checklist_item_id === item.id);
         const statusText = response?.status || "-";
         const statusColor = response?.status === "C" ? GREEN : response?.status === "NC" ? RED : GREY;
+        const num = itemNumberMap.get(item.id) || "-";
         checklistRows.push([
+          num,
           item.condition_ref || "-",
           item.description || "-",
           { content: statusText, styles: { textColor: statusColor, fontStyle: "bold", halign: "center" } },
@@ -1050,14 +1074,14 @@ Deno.serve(async (req) => {
     if (checklistRows.length > 0) {
       (doc as any).autoTable({
         startY: yRef.y,
-        head: [["Ref", "Condition", "Status", "Comments", "Actions"]],
+        head: [["#", "Ref", "Condition", "Status", "Comments", "Actions"]],
         body: checklistRows,
         theme: "grid",
         margin: { left: margin, right: margin },
         headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE, cellPadding: 2 },
         alternateRowStyles: { fillColor: [245, 250, 250] },
-        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 15 } },
+        columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 13 }, 3: { cellWidth: 12 } },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
     } else {
@@ -1074,6 +1098,7 @@ Deno.serve(async (req) => {
     if (photos.length > 0) {
       const photoRows = photos.map((p: any, idx: number) => [
         String(idx + 1),
+        photoItemRefMap.get(p.id) || "-",
         p.caption || "No caption",
         p.gps_location || "N/A",
         p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A",
@@ -1081,7 +1106,7 @@ Deno.serve(async (req) => {
 
       (doc as any).autoTable({
         startY: yRef.y,
-        head: [["#", "Caption", "GPS Location", "Date"]],
+        head: [["#", "Item Ref", "Caption", "GPS Location", "Date"]],
         body: photoRows,
         theme: "grid",
         margin: { left: margin, right: margin },

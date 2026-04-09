@@ -58,7 +58,7 @@ function AuditReportRow({
         auditId: audit.id,
         projectId: audit.project_id,
       };
-      if (clientLogoUrl && format === 'pdf') reqBody.clientLogoUrl = clientLogoUrl;
+      if (clientLogoUrl) reqBody.clientLogoUrl = clientLogoUrl;
 
       const response = await fetch(url, {
         method: 'POST',
