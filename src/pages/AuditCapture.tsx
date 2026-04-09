@@ -144,7 +144,7 @@ export default function AuditCapture() {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], actions } }));
   }, []);
   const handlePhotosChange = useCallback((itemId: string, photos: any[]) => {
-    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], photos } }));
+    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], photos: photos.map(p => ({ ...p, storagePath: p.storagePath || '' })) } }));
   }, []);
 
   const getFilteredItems = useCallback((objectiveId: string) => {
@@ -214,6 +214,14 @@ export default function AuditCapture() {
         checklist_item_id: checklistItemId,
         status: (r.status === 'N/A' ? 'NA' : r.status) as 'C' | 'NC' | 'NA' | null,
         comments: r.comments || '', actions: r.actions || '',
+        photos: r.photos?.map(p => ({
+          id: p.id || '',
+          url: p.url || '',
+          caption: p.caption || '',
+          gpsLocation: p.gpsLocation,
+          exifDate: p.timestamp,
+          storagePath: (p as any).storagePath || '',
+        })) || [],
       }));
 
     const overrides = sections.map(s => ({ section_id: s.id, is_active: !inactiveSections.has(s.id) }));
