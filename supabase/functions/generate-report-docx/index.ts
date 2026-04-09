@@ -627,7 +627,7 @@ Deno.serve(async (req) => {
         columnWidths: brkCols,
         rows: [
           new TableRow({ children: [headerCell("Phase", brkCols[0], SLATE), headerCell("Source", brkCols[1], SLATE), headerCell("C", brkCols[2], SLATE), headerCell("NC", brkCols[3], SLATE), headerCell("N/A", brkCols[4], SLATE), headerCell("Compliance %", brkCols[5], SLATE)] }),
-          ...sections.map((s: any) => {
+          ...activeSections.map((s: any) => {
             const si = items.filter((i: any) => i.section_id === s.id);
             const sr = responses.filter((r: any) => si.some((i: any) => i.id === r.checklist_item_id));
             const sC = sr.filter((r: any) => r.status === "C").length;
@@ -637,12 +637,12 @@ Deno.serve(async (req) => {
             const sPct = sT > 0 ? Math.round((sC / sT) * 100) : 0;
             return new TableRow({
               children: [
-                dataCell(s._inactive ? `${s.name} (INACTIVE)` : s.name, brkCols[0], { bold: true }),
+                dataCell(s.name, brkCols[0], { bold: true }),
                 dataCell(s.source, brkCols[1]),
-                dataCell(s._inactive ? "-" : String(sC), brkCols[2]),
-                dataCell(s._inactive ? "-" : String(sNC), brkCols[3]),
-                dataCell(s._inactive ? "-" : String(sNA), brkCols[4]),
-                dataCell(s._inactive ? "N/A" : `${sPct}%`, brkCols[5], { bold: true }),
+                dataCell(String(sC), brkCols[2]),
+                dataCell(String(sNC), brkCols[3]),
+                dataCell(String(sNA), brkCols[4]),
+                dataCell(`${sPct}%`, brkCols[5], { bold: true }),
               ],
             });
           }),
@@ -764,16 +764,13 @@ Deno.serve(async (req) => {
         new TableRow({ children: [headerCell("Ref", appCols[0], TEAL), headerCell("Condition", appCols[1], TEAL), headerCell("Status", appCols[2], TEAL), headerCell("Comments", appCols[3], TEAL), headerCell("Actions", appCols[4], TEAL)] }),
       ];
 
-      for (const section of sections) {
-        const label = section._inactive
-          ? `${section.source} - ${section.name} [INACTIVE - Not assessed in this audit]`
-          : `${section.source} - ${section.name}`;
-        const hdrFill = section._inactive ? "787878" : SLATE;
+      for (const section of activeSections) {
+        const label = `${section.source} - ${section.name}`;
         appRows.push(new TableRow({
           children: [
             new TableCell({
               borders: cellBorders, columnSpan: 5,
-              shading: { fill: hdrFill, type: ShadingType.CLEAR }, margins: cellMargins,
+              shading: { fill: SLATE, type: ShadingType.CLEAR }, margins: cellMargins,
               width: { size: CONTENT_W, type: WidthType.DXA },
               children: [new Paragraph({ children: [new TextRun({ text: label, font: "Arial", size: 18, bold: true, color: WHITE })] })],
             }),
