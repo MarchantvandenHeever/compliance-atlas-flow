@@ -500,7 +500,19 @@ export default function AuditCapture() {
 
       {/* Checklist */}
       <div className="space-y-2">
-        {sections.filter(s => sourceFilter === 'all' || s.source === sourceFilter).map(section => {
+        {templateGroups.length > 1 && templateGroups.map((tg, tgIdx) => {
+          const tgSections = tg.sections.filter(s => sourceFilter === 'all' || s.source === sourceFilter);
+          if (tgSections.length === 0) return null;
+          return (
+            <div key={tg.templateId} className="space-y-2">
+              <div className="bg-primary/5 border-l-4 border-primary rounded-r-lg px-4 py-2">
+                <h3 className="text-sm font-bold text-primary">{tgIdx + 1}. {tg.templateName}</h3>
+              </div>
+              {renderSections(tgSections)}
+            </div>
+          );
+        })}
+        {templateGroups.length <= 1 && renderSections(sections.filter(s => sourceFilter === 'all' || s.source === sourceFilter))}
           const isExpanded = expandedSections.has(section.id);
           const isSectionInactive = inactiveSections.has(section.id);
           const sectionObjectives = has3Level
