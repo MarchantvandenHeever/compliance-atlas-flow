@@ -199,6 +199,14 @@ export function useSaveAuditResponses() {
         status: 'C' | 'NC' | 'NA' | null;
         comments?: string;
         actions?: string;
+        photos?: Array<{
+          id?: string;
+          url: string;
+          caption: string;
+          gpsLocation?: string;
+          exifDate?: string;
+          storagePath: string;
+        }>;
       }>;
     }) => {
       const upserts = responses.map(r => ({
@@ -211,11 +219,55 @@ export function useSaveAuditResponses() {
         last_edited_at: new Date().toISOString(),
       }));
 
-      const { error } = await supabase
+      const { data: savedResponses, error } = await supabase
         .from('audit_item_responses')
-        .upsert(upserts, { onConflict: 'audit_id,checklist_item_id', ignoreDuplicates: false });
+        .upsert(upserts, { onConflict: 'audit_id,checklist_item_id', ignoreDuplicates: false })
+        .select('id, checklist_item_id');
 
       if (error) throw error;
+
+      // Build a map of checklist_item_id -> response row id
+      const responseIdMap: Record<string, string> = {};
+      savedResponses?.forEach(r => { responseIdMap[r.checklist_item_id] = r.id; });
+
+      // Persist photos to response_photos for each response that has photos
+      for (const r of responses) {
+        const responseId = responseIdMap[r.checklist_item_id];
+        if (!responseId || !r.photos?.length) continue;
+
+        // Get existing photos for this response
+        const { data: existingPhotos } = await supabase
+          .from('response_photos')
+          .select('id, storage_path')
+          .eq('response_id', responseId);
+
+        const existingPaths = new Set(existingPhotos?.map(p => p.storage_path) || []);
+        const newPhotos = r.photos.filter(p => p.storagePath && !existingPaths.has(p.storagePath));
+
+        if (newPhotos.length > 0) {
+          const photoInserts = newPhotos.map(p => ({
+            response_id: responseId,
+            storage_path: p.storagePath,
+            caption: p.caption || null,
+            gps_location: p.gpsLocation || null,
+            exif_date: p.exifDate || null,
+          }));
+
+          const { error: photoErr } = await supabase
+            .from('response_photos')
+            .insert(photoInserts);
+          if (photoErr) console.error('Photo save error:', photoErr);
+        }
+
+        // Update captions for existing photos
+        for (const p of r.photos) {
+          if (p.id && p.id !== '') {
+            await supabase.from('response_photos')
+              .update({ caption: p.caption || null })
+              .eq('id', p.id);
+          }
+        }
+      }
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['audit-responses', vars.auditId] });
