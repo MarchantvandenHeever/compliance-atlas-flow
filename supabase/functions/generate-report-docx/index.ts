@@ -330,7 +330,11 @@ Deno.serve(async (req) => {
     }));
 
     // Review status
-    const statusFill = auditData?.status === "approved" ? GREEN : AMBER;
+    const statusFillMap: Record<string, string> = {
+      approved: GREEN, disapproved: RED, amendments_requested: AMBER,
+      under_review: "3B82F6", pending_review: AMBER,
+    };
+    const statusFill = statusFillMap[reportStatus] || AMBER;
     children.push(new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 400 },
@@ -349,7 +353,8 @@ Deno.serve(async (req) => {
         new TableRow({ children: [dataCell("Location:", coverColWidths[0], { bold: true }), dataCell(projLocation, coverColWidths[1])] }),
         new TableRow({ children: [dataCell("Audit Period:", coverColWidths[0], { bold: true }), dataCell(period, coverColWidths[1])] }),
         new TableRow({ children: [dataCell("Author:", coverColWidths[0], { bold: true }), dataCell(author, coverColWidths[1])] }),
-        new TableRow({ children: [dataCell("Reviewer:", coverColWidths[0], { bold: true }), dataCell(reviewer, coverColWidths[1])] }),
+        new TableRow({ children: [dataCell("Reviewer:", coverColWidths[0], { bold: true }), dataCell(reviewerName, coverColWidths[1])] }),
+        new TableRow({ children: [dataCell("Reviewed Date:", coverColWidths[0], { bold: true }), dataCell(reviewedAtStr, coverColWidths[1])] }),
         new TableRow({ children: [dataCell("Review Status:", coverColWidths[0], { bold: true }), dataCell(reviewStatus, coverColWidths[1])] }),
       ],
     }));
@@ -371,10 +376,12 @@ Deno.serve(async (req) => {
       rows: [
         new TableRow({ children: [dataCell("Document Title:", revTrackCols[0], { bold: true }), dataCell(reportTitle, revTrackCols[1])] }),
         new TableRow({ children: [dataCell("Client Name:", revTrackCols[0], { bold: true }), dataCell(projClient, revTrackCols[1])] }),
-        new TableRow({ children: [dataCell("Status:", revTrackCols[0], { bold: true }), dataCell(auditData?.status === "approved" ? "Approved" : "Draft", revTrackCols[1])] }),
+        new TableRow({ children: [dataCell("Report Review Status:", revTrackCols[0], { bold: true }), dataCell(reviewStatus, revTrackCols[1])] }),
+        new TableRow({ children: [dataCell("Reviewed By:", revTrackCols[0], { bold: true }), dataCell(reviewerName, revTrackCols[1])] }),
+        new TableRow({ children: [dataCell("Reviewed Date:", revTrackCols[0], { bold: true }), dataCell(reviewedAtStr, revTrackCols[1])] }),
         new TableRow({ children: [dataCell("Issue Date:", revTrackCols[0], { bold: true }), dataCell(new Date().toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" }), revTrackCols[1])] }),
         new TableRow({ children: [dataCell("ECO (Report Writer):", revTrackCols[0], { bold: true }), dataCell(author, revTrackCols[1])] }),
-        new TableRow({ children: [dataCell("Senior ECO / Reviewer:", revTrackCols[0], { bold: true }), dataCell(reviewer, revTrackCols[1])] }),
+        new TableRow({ children: [dataCell("Senior ECO / Reviewer:", revTrackCols[0], { bold: true }), dataCell(reviewerName, revTrackCols[1])] }),
       ],
     }));
 
@@ -425,7 +432,7 @@ Deno.serve(async (req) => {
       rows: [
         new TableRow({ children: [headerCell("Role", teamCols[0], TEAL), headerCell("Name", teamCols[1], TEAL), headerCell("Responsibility", teamCols[2], TEAL)] }),
         new TableRow({ children: [dataCell("Environmental Control Officer (ECO)", teamCols[0]), dataCell(author, teamCols[1]), dataCell("Report Writer", teamCols[2])] }),
-        new TableRow({ children: [dataCell("Senior ECO / Reviewer", teamCols[0]), dataCell(reviewer, teamCols[1]), dataCell("Reviewer", teamCols[2])] }),
+        new TableRow({ children: [dataCell("Senior ECO / Reviewer", teamCols[0]), dataCell(reviewerName, teamCols[1]), dataCell("Reviewer", teamCols[2])] }),
       ],
     }));
 
