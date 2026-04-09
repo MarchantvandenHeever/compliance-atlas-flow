@@ -2,9 +2,9 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   FileSpreadsheet, CheckCircle2, ChevronDown, ChevronRight, Upload,
-  Loader2, Trash2, Eye, MoreVertical,
+  Loader2, Trash2, Eye, MoreVertical, ArrowUp, ArrowDown,
 } from 'lucide-react';
-import { useTemplates, useTemplateSections, useTemplateObjectives, useTemplateItems, useImportChecklist, useDeleteTemplate } from '@/hooks/useTemplates';
+import { useTemplates, useTemplateSections, useTemplateObjectives, useTemplateItems, useImportChecklist, useDeleteTemplate, useReorderSections, useReorderObjectives } from '@/hooks/useTemplates';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import {
