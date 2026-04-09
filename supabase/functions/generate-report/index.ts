@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
     let previousAuditData: any = null;
     let previousResponses: any[] = [];
     let revisionLog: any[] = [];
+    let reportReview: any = null;
+    let reviewerName = reviewer;
 
     if (auditId) {
       const { data: audit } = await supabase
@@ -111,6 +113,25 @@ Deno.serve(async (req) => {
         .eq("audit_id", auditId)
         .order("revision_number", { ascending: true });
       revisionLog = revLog || [];
+
+      // Fetch report review status and reviewer profile
+      const { data: rr } = await supabase
+        .from("report_reviews")
+        .select("*")
+        .eq("audit_id", auditId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (rr && rr.length > 0) {
+        reportReview = rr[0];
+        if (reportReview.reviewer_id) {
+          const { data: revProfile } = await supabase
+            .from("profiles")
+            .select("display_name")
+            .eq("user_id", reportReview.reviewer_id)
+            .single();
+          if (revProfile?.display_name) reviewerName = revProfile.display_name;
+        }
+      }
 
       const { data: sectionOverrides } = await supabase
         .from("audit_section_overrides")
@@ -221,8 +242,28 @@ Deno.serve(async (req) => {
     const projClient = projectData?.client || "Client";
     const projLocation = projectData?.location || "Location";
     const hasPrevious = !!previousAuditData;
-    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
-    const reviewColor = auditData?.status === "approved" ? GREEN : AMBER;
+
+    // Derive review status from report_reviews table
+    const reportStatus = reportReview?.status || "pending_review";
+    const reviewStatusMap: Record<string, string> = {
+      approved: "REVIEWED AND APPROVED",
+      disapproved: "DISAPPROVED",
+      amendments_requested: "AMENDMENTS REQUESTED",
+      under_review: "UNDER REVIEW",
+      pending_review: "PENDING REVIEW",
+    };
+    const reviewStatus = reviewStatusMap[reportStatus] || "PENDING REVIEW";
+    const reviewColorMap: Record<string, readonly [number, number, number]> = {
+      approved: GREEN,
+      disapproved: RED,
+      amendments_requested: AMBER,
+      under_review: [59, 130, 246],
+      pending_review: AMBER,
+    };
+    const reviewColor = reviewColorMap[reportStatus] || AMBER;
+    const reviewedAtStr = reportReview?.reviewed_at
+      ? new Date(reportReview.reviewed_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })
+      : "—";
 
     const addFooter = () => {
       pageNum++;
@@ -351,7 +392,7 @@ Deno.serve(async (req) => {
     doc.setTextColor(255, 255, 255);
     doc.text(period, margin, metaY + 7);
     doc.text(author, margin + 45, metaY + 7);
-    doc.text(reviewer, margin + 90, metaY + 7);
+    doc.text(reviewerName, margin + 90, metaY + 7);
     doc.text(reviewStatus, margin + 135, metaY + 7);
     doc.setFillColor(...TEAL);
     doc.rect(0, pageH - 8, pageW, 8, "F");
@@ -368,10 +409,12 @@ Deno.serve(async (req) => {
     const revTrackingBody: any[] = [
       ["Document Title:", reportTitle],
       ["Client Name:", projClient],
-      ["Status:", auditData?.status === "approved" ? "Approved" : "Draft"],
+      ["Report Review Status:", reviewStatus],
+      ["Reviewed By:", reviewerName],
+      ["Reviewed Date:", reviewedAtStr],
       ["Issue Date:", new Date().toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })],
       ["Environmental Control Officer:", author],
-      ["Senior Environmental Control Officer / Reviewer:", reviewer],
+      ["Senior Environmental Control Officer / Reviewer:", reviewerName],
     ];
 
     (doc as any).autoTable({
@@ -438,7 +481,7 @@ Deno.serve(async (req) => {
 
     const teamBody: any[] = [
       ["Environmental Control Officer (ECO):", author, "Report Writer"],
-      ["Senior ECO / Reviewer:", reviewer, "Reviewer"],
+      ["Senior ECO / Reviewer:", reviewerName, "Reviewer"],
     ];
 
     (doc as any).autoTable({
@@ -540,7 +583,9 @@ Deno.serve(async (req) => {
         ["Audit Period", period],
         ["Audit Type", auditData?.type || "Monthly"],
         ["Auditor (ECO)", author],
-        ["Reviewer", reviewer],
+        ["Reviewer", reviewerName],
+        ["Review Status", reviewStatus],
+        ["Reviewed Date", reviewedAtStr],
         ...(auditData?.revision_count > 0 ? [["Revision", `Rev ${auditData.revision_count}`]] : []),
       ],
       theme: "grid",
