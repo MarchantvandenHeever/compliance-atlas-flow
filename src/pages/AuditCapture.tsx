@@ -487,7 +487,7 @@ export default function AuditCapture() {
                 <option value="">+ New audit</option>
                 {projectAudits.map(a => (
                   <option key={a.id} value={a.id}>
-                    {a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
+                    {(a as any).name || a.period} — {a.status}{a.status === 'draft' ? ' (continue)' : ''}
                   </option>
                 ))}
               </select>
