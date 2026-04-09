@@ -125,6 +125,47 @@ export function useDeleteTemplate() {
   });
 }
 
+export function useReorderSections() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (sections: Array<{ id: string; sort_order: number }>) => {
+      for (const s of sections) {
+        const { error } = await supabase
+          .from('checklist_sections')
+          .update({ sort_order: s.sort_order })
+          .eq('id', s.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['template-sections'] });
+      qc.invalidateQueries({ queryKey: ['template-sections-multi'] });
+      toast.success('Section order updated');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useReorderObjectives() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (objectives: Array<{ id: string; sort_order: number }>) => {
+      for (const o of objectives) {
+        const { error } = await supabase
+          .from('checklist_objectives')
+          .update({ sort_order: o.sort_order })
+          .eq('id', o.id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['template-objectives'] });
+      toast.success('Objective order updated');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useImportChecklist() {
   const qc = useQueryClient();
   const { profile } = useAuth();
