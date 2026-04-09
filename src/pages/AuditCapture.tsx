@@ -392,8 +392,19 @@ export default function AuditCapture() {
                                         {opt.shortLabel}
                                       </button>
                                     ))}
+                                    </div>
+                                    {response?.status === 'NC' && (
+                                      <div className="flex gap-0.5 flex-shrink-0 border-l pl-1 ml-1">
+                                        {SEVERITY_OPTIONS.map(sev => (
+                                          <button key={sev.value} onClick={() => !isLocked && setNcSeverity(item.id, sev.value)} disabled={isLocked}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all border ${response?.ncSeverity === sev.value ? sev.color : 'border-transparent bg-muted/30 text-muted-foreground hover:bg-muted'} ${isLocked ? 'cursor-not-allowed' : ''}`}
+                                            title={`${sev.label} severity`}>
+                                            {sev.label[0]}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
                                 {(() => {
                                   const itemComments = reviewComments?.filter(c => c.checklist_item_id === item.id && c.status === 'open');
                                   if (!itemComments?.length) return null;
