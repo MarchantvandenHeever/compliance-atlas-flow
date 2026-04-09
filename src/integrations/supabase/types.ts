@@ -592,6 +592,129 @@ export type Database = {
           },
         ]
       }
+      report_review_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          report_review_id: string
+          reviewer_id: string
+          section: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          report_review_id: string
+          reviewer_id: string
+          section?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          report_review_id?: string
+          reviewer_id?: string
+          section?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_review_comments_report_review_id_fkey"
+            columns: ["report_review_id"]
+            isOneToOne: false
+            referencedRelation: "report_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_reviews: {
+        Row: {
+          audit_id: string
+          created_at: string
+          general_comment: string | null
+          id: string
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: Database["public"]["Enums"]["report_review_status"]
+          updated_at: string
+        }
+        Insert: {
+          audit_id: string
+          created_at?: string
+          general_comment?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["report_review_status"]
+          updated_at?: string
+        }
+        Update: {
+          audit_id?: string
+          created_at?: string
+          general_comment?: string | null
+          id?: string
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: Database["public"]["Enums"]["report_review_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_reviews_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audit_instances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_versions: {
+        Row: {
+          created_at: string
+          format: string
+          id: string
+          report_review_id: string
+          storage_path: string
+          upload_type: string
+          uploaded_by: string
+          version_number: number
+        }
+        Insert: {
+          created_at?: string
+          format?: string
+          id?: string
+          report_review_id: string
+          storage_path: string
+          upload_type?: string
+          uploaded_by: string
+          version_number?: number
+        }
+        Update: {
+          created_at?: string
+          format?: string
+          id?: string
+          report_review_id?: string
+          storage_path?: string
+          upload_type?: string
+          uploaded_by?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_versions_report_review_id_fkey"
+            columns: ["report_review_id"]
+            isOneToOne: false
+            referencedRelation: "report_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       response_photos: {
         Row: {
           caption: string | null
@@ -727,6 +850,12 @@ export type Database = {
       checklist_source: "EA" | "EMPr"
       compliance_status: "C" | "NC" | "NA"
       project_status: "active" | "completed" | "on_hold"
+      report_review_status:
+        | "pending_review"
+        | "under_review"
+        | "amendments_requested"
+        | "approved"
+        | "disapproved"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -868,6 +997,13 @@ export const Constants = {
       checklist_source: ["EA", "EMPr"],
       compliance_status: ["C", "NC", "NA"],
       project_status: ["active", "completed", "on_hold"],
+      report_review_status: [
+        "pending_review",
+        "under_review",
+        "amendments_requested",
+        "approved",
+        "disapproved",
+      ],
     },
   },
 } as const
