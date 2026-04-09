@@ -10,6 +10,7 @@ import { useProjects } from '@/hooks/useProjects';
 import {
   useReviewComments, useAddReviewComment, useResolveReviewComment,
   useRequestAmendments, useApproveAudit, useStartReview,
+  useMarkItemReviewed, useUnmarkItemReviewed,
 } from '@/hooks/useReviewData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyProjectIds } from '@/hooks/useProjectTeam';
@@ -37,6 +38,8 @@ function AuditReviewDetail({
   const resolveComment = useResolveReviewComment();
   const requestAmendments = useRequestAmendments();
   const approveAudit = useApproveAudit();
+  const markReviewed = useMarkItemReviewed();
+  const unmarkReviewed = useUnmarkItemReviewed();
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [itemComment, setItemComment] = useState<Record<string, string>>({});
