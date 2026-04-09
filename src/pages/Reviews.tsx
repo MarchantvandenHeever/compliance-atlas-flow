@@ -10,6 +10,7 @@ import { useProjects } from '@/hooks/useProjects';
 import {
   useReviewComments, useAddReviewComment, useResolveReviewComment,
   useRequestAmendments, useApproveAudit, useStartReview,
+  useMarkItemReviewed, useUnmarkItemReviewed,
 } from '@/hooks/useReviewData';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyProjectIds } from '@/hooks/useProjectTeam';
@@ -37,6 +38,8 @@ function AuditReviewDetail({
   const resolveComment = useResolveReviewComment();
   const requestAmendments = useRequestAmendments();
   const approveAudit = useApproveAudit();
+  const markReviewed = useMarkItemReviewed();
+  const unmarkReviewed = useUnmarkItemReviewed();
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [itemComment, setItemComment] = useState<Record<string, string>>({});
@@ -52,11 +55,21 @@ function AuditReviewDetail({
   const commentsMap = useMemo(() => {
     const map: Record<string, any[]> = {};
     reviewComments?.forEach(c => {
+      if (c.status === 'reviewed') return; // skip reviewed markers from comment map
       const key = c.checklist_item_id || '__general__';
       if (!map[key]) map[key] = [];
       map[key].push(c);
     });
     return map;
+  }, [reviewComments]);
+
+  // Track which items have been marked as reviewed
+  const reviewedItemIds = useMemo(() => {
+    const set = new Set<string>();
+    reviewComments?.forEach(c => {
+      if (c.status === 'reviewed' && c.checklist_item_id) set.add(c.checklist_item_id);
+    });
+    return set;
   }, [reviewComments]);
 
   const inactiveSections = useMemo(() => {
@@ -68,6 +81,17 @@ function AuditReviewDetail({
   const sections = dbSections?.map(s => ({ id: s.id, name: s.name, source: s.source })) || [];
   const objectives = dbObjectives?.map(o => ({ id: o.id, sectionId: o.section_id, name: o.name })) || [];
   const items = dbItems?.map(i => ({ id: i.id, objectiveId: i.objective_id, description: i.description })) || [];
+
+  // Count total active items for review progress
+  const totalActiveItems = useMemo(() => {
+    return items.filter(i => {
+      const obj = objectives.find(o => o.id === i.objectiveId);
+      if (!obj) return false;
+      return !inactiveSections.has(obj.sectionId);
+    }).length;
+  }, [items, objectives, inactiveSections]);
+
+  const reviewProgress = totalActiveItems > 0 ? Math.round((reviewedItemIds.size / totalActiveItems) * 100) : 0;
 
   const toggleSection = (id: string) => {
     setExpandedSections(prev => {
@@ -115,6 +139,10 @@ function AuditReviewDetail({
   };
 
   const handleApprove = async () => {
+    const unreviewedCount = totalActiveItems - reviewedItemIds.size;
+    if (unreviewedCount > 0) {
+      if (!confirm(`${unreviewedCount} item(s) have not been marked as reviewed. Approve anyway?`)) return;
+    }
     const openCount = reviewComments?.filter(c => c.status === 'open').length || 0;
     if (openCount > 0) {
       if (!confirm(`There are ${openCount} unresolved comment(s). Approve anyway?`)) return;
@@ -155,6 +183,18 @@ function AuditReviewDetail({
       <div className="bg-card border rounded-lg p-4">
         <h3 className="text-lg font-semibold">{projectName} — {audit.period}</h3>
         <p className="text-sm text-muted-foreground">{audit.type} audit · Submitted {audit.submitted_at ? new Date(audit.submitted_at).toLocaleDateString() : '—'}</p>
+        {/* Review Progress */}
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${reviewProgress}%` }}
+            />
+          </div>
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+            {reviewedItemIds.size}/{totalActiveItems} items reviewed ({reviewProgress}%)
+          </span>
+        </div>
       </div>
 
       {/* Audit Content */}
@@ -203,10 +243,31 @@ function AuditReviewDetail({
                                   const itemComments = commentsMap[item.id] || [];
                                   const openItemComments = itemComments.filter(c => c.status === 'open');
                                   const resolvedItemComments = itemComments.filter(c => c.status === 'resolved');
+                                  const isItemReviewed = reviewedItemIds.has(item.id);
+
+                                  const handleToggleReviewed = () => {
+                                    if (isItemReviewed) {
+                                      unmarkReviewed.mutate({ auditId: audit.id, checklistItemId: item.id });
+                                    } else {
+                                      markReviewed.mutate({ auditId: audit.id, checklistItemId: item.id });
+                                    }
+                                  };
 
                                   return (
-                                    <div key={item.id} className="rounded-md border bg-background">
+                                    <div key={item.id} className={`rounded-md border bg-background ${isItemReviewed ? 'border-green-300 bg-green-50/30' : ''}`}>
                                       <div className="flex items-start gap-3 px-3 py-2.5">
+                                        {/* Reviewed checkbox */}
+                                        <button
+                                          onClick={handleToggleReviewed}
+                                          className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                            isItemReviewed
+                                              ? 'bg-green-600 border-green-600 text-white'
+                                              : 'border-muted-foreground/40 hover:border-primary'
+                                          }`}
+                                          title={isItemReviewed ? 'Unmark as reviewed' : 'Mark as reviewed'}
+                                        >
+                                          {isItemReviewed && <CheckCircle2 size={12} />}
+                                        </button>
                                         <div className="flex-1 min-w-0">
                                           <p className="text-sm">{item.description}</p>
                                           {response?.comments && (
@@ -220,7 +281,10 @@ function AuditReviewDetail({
                                             </p>
                                           )}
                                         </div>
-                                        <div className="flex-shrink-0">
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                          {isItemReviewed && (
+                                            <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded">Reviewed</span>
+                                          )}
                                           {statusLabel(response?.status || null)}
                                         </div>
                                       </div>

@@ -69,6 +69,61 @@ export function useResolveReviewComment() {
   });
 }
 
+/** Mark a checklist item as reviewed by the reviewer */
+export function useMarkItemReviewed() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async ({ auditId, checklistItemId }: { auditId: string; checklistItemId: string }) => {
+      // Check if already marked reviewed
+      const { data: existing } = await supabase
+        .from('review_comments')
+        .select('id')
+        .eq('audit_id', auditId)
+        .eq('checklist_item_id', checklistItemId)
+        .eq('status', 'reviewed')
+        .limit(1);
+      if (existing && existing.length > 0) return; // already reviewed
+
+      const { error } = await supabase
+        .from('review_comments')
+        .insert({
+          audit_id: auditId,
+          checklist_item_id: checklistItemId,
+          reviewer_id: user?.id || '',
+          comment: 'Item reviewed',
+          status: 'reviewed',
+        });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['review-comments', vars.auditId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Unmark a checklist item as reviewed */
+export function useUnmarkItemReviewed() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ auditId, checklistItemId }: { auditId: string; checklistItemId: string }) => {
+      const { error } = await supabase
+        .from('review_comments')
+        .delete()
+        .eq('audit_id', auditId)
+        .eq('checklist_item_id', checklistItemId)
+        .eq('status', 'reviewed');
+      if (error) throw error;
+      return auditId;
+    },
+    onSuccess: (auditId) => {
+      qc.invalidateQueries({ queryKey: ['review-comments', auditId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useSubmitForReview() {
   const qc = useQueryClient();
   return useMutation({
