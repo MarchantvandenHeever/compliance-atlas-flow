@@ -6,6 +6,7 @@ import MetricCard from '@/components/MetricCard';
 import ProjectFilter from '@/components/ProjectFilter';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { Link } from 'react-router-dom';
+import DashboardExport from '@/components/DashboardExport';
 
 const COLORS = ['#0096A6', '#ef4444', '#9ca3af'];
 
@@ -39,7 +40,10 @@ export default function Dashboard() {
             {auditCount} audits • {draftCount} drafts • {submittedCount} submitted
           </p>
         </div>
-        <ProjectFilter projects={projects} selectedProjectId={selectedProject} onChange={setSelectedProject} />
+        <div className="flex items-center gap-2">
+          <DashboardExport auditMetrics={auditMetrics} trendData={trendData} totals={totals} selectedProject={selectedProject} projects={projects} pageTitle="Dashboard" />
+          <ProjectFilter projects={projects} selectedProjectId={selectedProject} onChange={setSelectedProject} />
+        </div>
       </div>
 
       {/* Summary Metric Cards — real data */}
