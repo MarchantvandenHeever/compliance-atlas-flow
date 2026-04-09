@@ -12,7 +12,8 @@ export function useProjectTemplates(projectId?: string) {
       const { data, error } = await supabase
         .from('project_templates')
         .select('*, checklist_templates(id, name, version)')
-        .eq('project_id', projectId);
+        .eq('project_id', projectId)
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -27,7 +28,8 @@ export function useAllProjectTemplates() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('project_templates')
-        .select('*, checklist_templates(id, name, version)');
+        .select('*, checklist_templates(id, name, version)')
+        .order('sort_order', { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -41,11 +43,11 @@ export function useSetProjectTemplates() {
     mutationFn: async ({ projectId, templateIds }: { projectId: string; templateIds: string[] }) => {
       // Remove existing
       await supabase.from('project_templates').delete().eq('project_id', projectId);
-      // Insert new
+      // Insert new with sort_order
       if (templateIds.length > 0) {
         const { error } = await supabase
           .from('project_templates')
-          .insert(templateIds.map(tid => ({ project_id: projectId, template_id: tid })));
+          .insert(templateIds.map((tid, idx) => ({ project_id: projectId, template_id: tid, sort_order: idx })));
         if (error) throw error;
       }
     },
