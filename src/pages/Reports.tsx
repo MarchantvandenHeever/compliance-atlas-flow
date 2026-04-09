@@ -173,11 +173,23 @@ export default function Reports() {
                   </span>
                   <Link to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
                     className="text-xs text-primary hover:underline">View</Link>
-                  <button onClick={() => generatePDF(audit)} disabled={generating === audit.id}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
-                    {generating === audit.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                    PDF
-                  </button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button disabled={generating === audit.id}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors">
+                        {generating === audit.id ? <Loader2 size={12} className="animate-spin" /> : <FileDown size={12} />}
+                        Export
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => generateReport(audit, 'pdf')}>
+                        <Download size={14} className="mr-2" /> Download PDF
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => generateReport(audit, 'docx')}>
+                        <FileText size={14} className="mr-2" /> Download Word (.docx)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               );
             })}
