@@ -242,8 +242,28 @@ Deno.serve(async (req) => {
     const projClient = projectData?.client || "Client";
     const projLocation = projectData?.location || "Location";
     const hasPrevious = !!previousAuditData;
-    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
-    const reviewColor = auditData?.status === "approved" ? GREEN : AMBER;
+
+    // Derive review status from report_reviews table
+    const reportStatus = reportReview?.status || "pending_review";
+    const reviewStatusMap: Record<string, string> = {
+      approved: "REVIEWED AND APPROVED",
+      disapproved: "DISAPPROVED",
+      amendments_requested: "AMENDMENTS REQUESTED",
+      under_review: "UNDER REVIEW",
+      pending_review: "PENDING REVIEW",
+    };
+    const reviewStatus = reviewStatusMap[reportStatus] || "PENDING REVIEW";
+    const reviewColorMap: Record<string, readonly [number, number, number]> = {
+      approved: GREEN,
+      disapproved: RED,
+      amendments_requested: AMBER,
+      under_review: [59, 130, 246],
+      pending_review: AMBER,
+    };
+    const reviewColor = reviewColorMap[reportStatus] || AMBER;
+    const reviewedAtStr = reportReview?.reviewed_at
+      ? new Date(reportReview.reviewed_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })
+      : "—";
 
     const addFooter = () => {
       pageNum++;
