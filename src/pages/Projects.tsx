@@ -16,7 +16,7 @@ export default function Projects() {
   const createAudit = useCreateAudit();
   const navigate = useNavigate();
   const [creatingAuditFor, setCreatingAuditFor] = useState<string | null>(null);
-  const [selectingTemplateFor, setSelectingTemplateFor] = useState<string | null>(null);
+  // selectingTemplateFor removed - audits now use all project templates
 
   const getProjectTemplates = (projectId: string) =>
     allPT?.filter(pt => pt.project_id === projectId) || [];
