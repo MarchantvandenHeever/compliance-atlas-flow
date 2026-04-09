@@ -253,7 +253,20 @@ Deno.serve(async (req) => {
     const projClient = projectData?.client || "Client";
     const projLocation = projectData?.location || "Location";
     const hasPrevious = !!previousAuditData;
-    const reviewStatus = auditData?.status === "approved" ? "REVIEWED AND APPROVED" : "PENDING REVIEW";
+
+    // Derive review status from report_reviews table
+    const reportStatus = reportReview?.status || "pending_review";
+    const reviewStatusMap: Record<string, string> = {
+      approved: "REVIEWED AND APPROVED",
+      disapproved: "DISAPPROVED",
+      amendments_requested: "AMENDMENTS REQUESTED",
+      under_review: "UNDER REVIEW",
+      pending_review: "PENDING REVIEW",
+    };
+    const reviewStatus = reviewStatusMap[reportStatus] || "PENDING REVIEW";
+    const reviewedAtStr = reportReview?.reviewed_at
+      ? new Date(reportReview.reviewed_at).toLocaleDateString("en-ZA", { day: "2-digit", month: "long", year: "numeric" })
+      : "—";
 
     // ─── Helper: build findings table ───
     const buildFindingsTable = (filteredResp: any[], headerFill: string): Table => {
