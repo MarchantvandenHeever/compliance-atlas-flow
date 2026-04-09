@@ -27,6 +27,8 @@ export interface ChecklistTemplate {
   items: ChecklistItem[];
 }
 
+export type NCSeverity = 'low' | 'medium' | 'high';
+
 export interface AuditItemResponse {
   id: string;
   auditId: string;
@@ -35,6 +37,7 @@ export interface AuditItemResponse {
   comments: string;
   actions: string;
   photos: PhotoEvidence[];
+  ncSeverity?: NCSeverity | null;
   lastEditedAt: string;
   editedBy: string;
 }

@@ -311,21 +311,34 @@ Deno.serve(async (req) => {
       : "—";
 
     // ─── Helper: build findings table ───
-    const buildFindingsTable = (filteredResp: any[], headerFill: string): Table => {
-      const colWidths = [1000, 3200, 1600, 1800, 1426];
+    const buildFindingsTable = (filteredResp: any[], headerFill: string, includeSeverity = false): Table => {
+      const colWidths = includeSeverity
+        ? [800, 2800, 1000, 1400, 1600, 1426]
+        : [1000, 3200, 1600, 1800, 1426];
+      const headers = includeSeverity
+        ? ["Ref", "Condition", "Severity", "Phase", "Comments", "Actions"]
+        : ["Ref", "Condition", "Phase", "Comments", "Actions"];
       const rows = [
         new TableRow({
-          children: [
-            headerCell("Ref", colWidths[0], headerFill),
-            headerCell("Condition", colWidths[1], headerFill),
-            headerCell("Phase", colWidths[2], headerFill),
-            headerCell("Comments", colWidths[3], headerFill),
-            headerCell("Actions", colWidths[4], headerFill),
-          ],
+          children: headers.map((h, i) => headerCell(h, colWidths[i], headerFill)),
         }),
         ...filteredResp.map((r: any) => {
           const item = items.find((i: any) => i.id === r.checklist_item_id);
           const section = item ? sections.find((s: any) => s.id === item.section_id) : null;
+          const severity = (r.nc_severity || "medium").toUpperCase();
+          const sevColor = severity === "HIGH" ? RED : severity === "LOW" ? "3B82F6" : AMBER;
+          if (includeSeverity) {
+            return new TableRow({
+              children: [
+                dataCell(item?.condition_ref || "-", colWidths[0]),
+                dataCell(item?.description || "-", colWidths[1]),
+                dataCell(severity, colWidths[2], { bold: true, color: sevColor }),
+                dataCell(section?.name || "-", colWidths[3]),
+                dataCell(r.comments || "-", colWidths[4]),
+                dataCell(r.actions || "-", colWidths[5]),
+              ],
+            });
+          }
           return new TableRow({
             children: [
               dataCell(item?.condition_ref || "-", colWidths[0]),
@@ -613,9 +626,19 @@ Deno.serve(async (req) => {
     // 2.2.1 Non-Compliant
     children.push(subSubSection("2.2.1", "Non-Compliant Items"));
     const ncResp = activeResponses.filter((r: any) => r.status === "NC");
+    // Sort NC items by severity: high → medium → low
+    const sevOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    ncResp.sort((a: any, b: any) => (sevOrder[a.nc_severity || "medium"] || 1) - (sevOrder[b.nc_severity || "medium"] || 1));
+
     if (ncResp.length > 0) {
-      children.push(bodyPara(`A total of ${ncResp.length} non-conformance(s) were identified during this audit period.`));
-      children.push(buildFindingsTable(ncResp, RED));
+      const highCount = ncResp.filter((r: any) => r.nc_severity === "high").length;
+      const medCount = ncResp.filter((r: any) => !r.nc_severity || r.nc_severity === "medium").length;
+      const lowCount = ncResp.filter((r: any) => r.nc_severity === "low").length;
+      children.push(bodyPara(`A total of ${ncResp.length} non-conformance(s) were identified during this audit period${highCount ? ` (${highCount} high severity)` : ""}.`));
+      if (highCount || medCount || lowCount) {
+        children.push(bodyPara(`Severity breakdown: High: ${highCount}, Medium: ${medCount}, Low: ${lowCount}`));
+      }
+      children.push(buildFindingsTable(ncResp, RED, true));
     } else {
       children.push(nothingToReport());
     }

@@ -23,6 +23,7 @@ const statusIcons = {
 export default function Findings() {
   const [selectedProject, setSelectedProject] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const { user } = useAuth();
   const { projects, completedAudits } = useDashboardData(selectedProject || undefined);
 
@@ -62,11 +63,13 @@ export default function Findings() {
   // Build findings list combining NC responses with corrective actions
   const findings = useMemo(() => {
     if (!ncResponses) return [];
-    return ncResponses.map(r => {
+    const severityOrder = { high: 0, medium: 1, low: 2 };
+    const list = ncResponses.map(r => {
       const action = correctiveActions?.find(a => a.audit_id === r.audit_id && a.checklist_item_id === r.checklist_item_id);
       const audit = completedAudits.find(a => a.id === r.audit_id);
       const project = projects.find(p => p.id === audit?.project_id);
       const item = r.checklist_items as any;
+      const severity = ((r as any).nc_severity || action?.severity || 'medium') as 'low' | 'medium' | 'high';
       return {
         id: r.id,
         auditId: r.audit_id,
@@ -81,18 +84,25 @@ export default function Findings() {
         actions: r.actions || '',
         period: audit?.period || '',
         projectName: project?.name || '',
-        severity: (action?.severity || 'medium') as 'low' | 'medium' | 'high',
+        severity,
         status: (action?.status || 'open') as 'open' | 'in_progress' | 'closed',
         assignedTo: action?.assigned_to || '',
         targetDate: action?.target_date || '',
       };
     });
+    // Sort by severity: high first, then medium, then low
+    list.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+    return list;
   }, [ncResponses, correctiveActions, completedAudits, projects]);
 
-  const filtered = filterStatus === 'all' ? findings : findings.filter(f => f.status === filterStatus);
+  const statusFiltered = filterStatus === 'all' ? findings : findings.filter(f => f.status === filterStatus);
+  const filtered = filterSeverity === 'all' ? statusFiltered : statusFiltered.filter(f => f.severity === filterSeverity);
   const openCount = findings.filter(f => f.status === 'open').length;
   const inProgressCount = findings.filter(f => f.status === 'in_progress').length;
   const closedCount = findings.filter(f => f.status === 'closed').length;
+  const highCount = findings.filter(f => f.severity === 'high').length;
+  const mediumCount = findings.filter(f => f.severity === 'medium').length;
+  const lowCount = findings.filter(f => f.severity === 'low').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -122,6 +132,22 @@ export default function Findings() {
           className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${filterStatus === 'closed' ? 'bg-success text-success-foreground border-success' : 'bg-card border hover:bg-muted/50'}`}>
           Closed ({closedCount})
         </button>
+      </div>
+
+      {/* Severity filters */}
+      <div className="flex flex-wrap gap-2">
+        <span className="text-xs font-medium text-muted-foreground self-center mr-1">Severity:</span>
+        {[
+          { key: 'all', label: `All`, cls: 'bg-card border hover:bg-muted/50' },
+          { key: 'high', label: `High (${highCount})`, cls: 'bg-red-100 text-red-800 border-red-300' },
+          { key: 'medium', label: `Medium (${mediumCount})`, cls: 'bg-amber-100 text-amber-800 border-amber-300' },
+          { key: 'low', label: `Low (${lowCount})`, cls: 'bg-blue-100 text-blue-800 border-blue-300' },
+        ].map(s => (
+          <button key={s.key} onClick={() => setFilterSeverity(s.key)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${filterSeverity === s.key ? s.cls + ' ring-2 ring-offset-1 ring-primary/30' : 'bg-card border hover:bg-muted/50'}`}>
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {/* Findings List */}

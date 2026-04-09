@@ -217,6 +217,7 @@ export function useSaveAuditResponses() {
         status: 'C' | 'NC' | 'NA' | null;
         comments?: string;
         actions?: string;
+        nc_severity?: 'low' | 'medium' | 'high' | null;
         photos?: Array<{
           id?: string;
           url: string;
@@ -233,6 +234,7 @@ export function useSaveAuditResponses() {
         status: r.status,
         comments: r.comments || null,
         actions: r.actions || null,
+        nc_severity: r.status === 'NC' ? (r.nc_severity || 'medium') : null,
         last_edited_by: user?.id || null,
         last_edited_at: new Date().toISOString(),
       }));

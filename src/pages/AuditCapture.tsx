@@ -7,7 +7,7 @@ import { useSubmitForReview, useReviewComments, useResolveReviewComment } from '
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
-import { ComplianceStatus, AuditItemResponse } from '@/types';
+import { ComplianceStatus, AuditItemResponse, NCSeverity } from '@/types';
 import PhotoUpload from '@/components/PhotoUpload';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { defaultTemplate } from '@/data/checklistData';
@@ -16,6 +16,12 @@ const STATUS_OPTIONS: { value: ComplianceStatus; label: string; shortLabel: stri
   { value: 'C', label: 'Compliant', shortLabel: 'C', color: 'bg-green-500 hover:bg-green-600 text-white' },
   { value: 'NC', label: 'Non-Compliant', shortLabel: 'NC', color: 'bg-red-500 hover:bg-red-600 text-white' },
   { value: 'N/A', label: 'N/A / Noted', shortLabel: 'N/A', color: 'bg-gray-400 hover:bg-gray-500 text-white' },
+];
+
+const SEVERITY_OPTIONS: { value: NCSeverity; label: string; color: string }[] = [
+  { value: 'low', label: 'Low', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'medium', label: 'Medium', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { value: 'high', label: 'High', color: 'bg-red-100 text-red-800 border-red-300' },
 ];
 
 export default function AuditCapture() {
@@ -115,6 +121,7 @@ export default function AuditCapture() {
         const status = r.status === 'NA' ? 'N/A' : r.status;
         mapped[r.checklist_item_id] = {
           id: r.id, status: status as ComplianceStatus, comments: r.comments || '', actions: r.actions || '',
+          ncSeverity: (r as any).nc_severity || null,
           photos: r.response_photos?.map((p: any) => ({ id: p.id, url: '', caption: p.caption || '', timestamp: p.upload_date, gpsLocation: p.gps_location, storagePath: p.storage_path || '' })) || [],
         };
       });
@@ -164,7 +171,18 @@ export default function AuditCapture() {
   }, []);
 
   const setStatus = useCallback((itemId: string, status: ComplianceStatus) => {
-    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], status, lastEditedAt: new Date().toISOString() } }));
+    setResponses(prev => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        status,
+        ncSeverity: status === 'NC' ? (prev[itemId]?.ncSeverity || 'medium') : null,
+        lastEditedAt: new Date().toISOString(),
+      },
+    }));
+  }, []);
+  const setNcSeverity = useCallback((itemId: string, severity: NCSeverity) => {
+    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], ncSeverity: severity } }));
   }, []);
   const setComment = useCallback((itemId: string, comments: string) => {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], comments } }));
@@ -264,6 +282,7 @@ export default function AuditCapture() {
         checklist_item_id: checklistItemId,
         status: (r.status === 'N/A' ? 'NA' : r.status) as 'C' | 'NC' | 'NA' | null,
         comments: r.comments || '', actions: r.actions || '',
+        nc_severity: r.status === 'NC' ? (r.ncSeverity as any || 'medium') : null,
         photos: r.photos?.map(p => ({
           id: p.id || '',
           url: p.url || '',
@@ -373,8 +392,19 @@ export default function AuditCapture() {
                                         {opt.shortLabel}
                                       </button>
                                     ))}
+                                    </div>
+                                    {response?.status === 'NC' && (
+                                      <div className="flex gap-0.5 flex-shrink-0 border-l pl-1 ml-1">
+                                        {SEVERITY_OPTIONS.map(sev => (
+                                          <button key={sev.value} onClick={() => !isLocked && setNcSeverity(item.id, sev.value)} disabled={isLocked}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-medium transition-all border ${response?.ncSeverity === sev.value ? sev.color : 'border-transparent bg-muted/30 text-muted-foreground hover:bg-muted'} ${isLocked ? 'cursor-not-allowed' : ''}`}
+                                            title={`${sev.label} severity`}>
+                                            {sev.label[0]}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
-                                </div>
                                 {(() => {
                                   const itemComments = reviewComments?.filter(c => c.checklist_item_id === item.id && c.status === 'open');
                                   if (!itemComments?.length) return null;

@@ -296,6 +296,15 @@ function AuditReviewDetail({
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
+                                          {response?.status === 'NC' && response?.nc_severity && (
+                                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                                              response.nc_severity === 'high' ? 'bg-red-100 text-red-800' :
+                                              response.nc_severity === 'low' ? 'bg-blue-100 text-blue-800' :
+                                              'bg-amber-100 text-amber-800'
+                                            }`}>
+                                              {(response.nc_severity as string).toUpperCase()}
+                                            </span>
+                                          )}
                                           {isItemReviewed && (
                                             <span className="text-[10px] font-medium text-green-700 bg-green-100 px-1.5 py-0.5 rounded">Reviewed</span>
                                           )}
