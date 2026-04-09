@@ -23,6 +23,7 @@ const statusIcons = {
 export default function Findings() {
   const [selectedProject, setSelectedProject] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const { user } = useAuth();
   const { projects, completedAudits } = useDashboardData(selectedProject || undefined);
 
@@ -94,10 +95,14 @@ export default function Findings() {
     return list;
   }, [ncResponses, correctiveActions, completedAudits, projects]);
 
-  const filtered = filterStatus === 'all' ? findings : findings.filter(f => f.status === filterStatus);
+  const statusFiltered = filterStatus === 'all' ? findings : findings.filter(f => f.status === filterStatus);
+  const filtered = filterSeverity === 'all' ? statusFiltered : statusFiltered.filter(f => f.severity === filterSeverity);
   const openCount = findings.filter(f => f.status === 'open').length;
   const inProgressCount = findings.filter(f => f.status === 'in_progress').length;
   const closedCount = findings.filter(f => f.status === 'closed').length;
+  const highCount = findings.filter(f => f.severity === 'high').length;
+  const mediumCount = findings.filter(f => f.severity === 'medium').length;
+  const lowCount = findings.filter(f => f.severity === 'low').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
