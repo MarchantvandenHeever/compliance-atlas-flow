@@ -733,17 +733,21 @@ Deno.serve(async (req) => {
     subSectionHeader("2.2", "Summary of Audit Findings", yRef);
 
     // Helper to build item table rows
-    const buildItemTable = (filteredResponses: any[]) => {
+    const buildItemTable = (filteredResponses: any[], includeSevertiy = false) => {
       return filteredResponses.map((r: any) => {
         const item = items.find((i: any) => i.id === r.checklist_item_id);
         const section = item ? sections.find((s: any) => s.id === item.section_id) : null;
-        return [
+        const row = [
           item?.condition_ref || "-",
           item?.description || "-",
           section?.name || "-",
           r.comments || "-",
           r.actions || "-",
         ];
+        if (includeSevertiy) {
+          row.splice(2, 0, (r.nc_severity || "medium").toUpperCase());
+        }
+        return row;
       });
     };
 
@@ -751,19 +755,37 @@ Deno.serve(async (req) => {
     subSubHeader("2.2.1", "Non-Compliant Items", yRef);
 
     const ncResponses = activeResponses.filter((r: any) => r.status === "NC");
+    // Sort NC items by severity: high → medium → low
+    const sevOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+    ncResponses.sort((a: any, b: any) => (sevOrder[a.nc_severity || "medium"] || 1) - (sevOrder[b.nc_severity || "medium"] || 1));
+
     if (ncResponses.length > 0) {
-      bodyText(`A total of ${ncResponses.length} non-conformance(s) were identified during this audit period.`, yRef);
+      const highCount = ncResponses.filter((r: any) => r.nc_severity === "high").length;
+      const medCount = ncResponses.filter((r: any) => !r.nc_severity || r.nc_severity === "medium").length;
+      const lowCount = ncResponses.filter((r: any) => r.nc_severity === "low").length;
+      bodyText(`A total of ${ncResponses.length} non-conformance(s) were identified during this audit period${highCount ? ` (${highCount} high severity)` : ""}.`, yRef);
+      if (highCount || medCount || lowCount) {
+        bodyText(`Severity breakdown: High: ${highCount}, Medium: ${medCount}, Low: ${lowCount}`, yRef);
+      }
 
       yRef.y = ensureSpace(30, yRef.y);
       (doc as any).autoTable({
         startY: yRef.y,
-        head: [["Ref", "Condition", "Phase", "Comments", "Corrective Actions"]],
-        body: buildItemTable(ncResponses),
+        head: [["Ref", "Condition", "Severity", "Phase", "Comments", "Corrective Actions"]],
+        body: buildItemTable(ncResponses, true),
         theme: "grid",
         margin: { left: margin, right: margin },
         headStyles: { fillColor: RED, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
         bodyStyles: { fontSize: 7, textColor: SLATE },
-        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 28 } },
+        columnStyles: { 0: { cellWidth: 15 }, 2: { cellWidth: 18 } },
+        didDrawCell: (data: any) => {
+          if (data.section === "body" && data.column.index === 2) {
+            const val = String(data.cell.raw || "").toLowerCase();
+            if (val === "high") { doc.setTextColor(...RED); }
+            else if (val === "low") { doc.setTextColor(59, 130, 246); }
+            else { doc.setTextColor(...AMBER); }
+          }
+        },
         didDrawPage: () => { addFooter(); doc.setFillColor(...LIGHT_BG); doc.rect(0, 0, pageW, pageH, "F"); },
       });
       yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
