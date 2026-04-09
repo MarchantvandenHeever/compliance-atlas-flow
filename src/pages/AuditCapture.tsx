@@ -249,8 +249,8 @@ export default function AuditCapture() {
         <select
           value={projectId || ''}
           onChange={e => {
-            if (e.target.value) navigate(`/audit?projectId=${e.target.value}`);
-            else navigate('/audit');
+            if (e.target.value) navigate(`/audits/capture?projectId=${e.target.value}`);
+            else navigate('/audits');
           }}
           className="h-8 rounded-md border bg-background px-2 text-sm min-w-[180px]"
         >
