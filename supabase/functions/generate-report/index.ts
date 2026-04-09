@@ -1096,24 +1096,72 @@ Deno.serve(async (req) => {
     doc.text("Appendix B — Photo Evidence", margin, yRef.y); yRef.y += 3; drawHR(yRef.y); yRef.y += 10;
 
     if (photos.length > 0) {
-      const photoRows = photos.map((p: any, idx: number) => [
-        String(idx + 1),
-        photoItemRefMap.get(p.id) || "-",
-        p.caption || "No caption",
-        p.gps_location || "N/A",
-        p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A",
-      ]);
+      // Fetch actual photo images
+      const storageBase = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/`;
+      const photoImages: (string | null)[] = [];
+      for (const p of photos) {
+        if (p.storage_path) {
+          const imgData = await fetchImageBase64(storageBase + p.storage_path);
+          photoImages.push(imgData);
+        } else {
+          photoImages.push(null);
+        }
+      }
 
-      (doc as any).autoTable({
-        startY: yRef.y,
-        head: [["#", "Item Ref", "Caption", "GPS Location", "Date"]],
-        body: photoRows,
-        theme: "grid",
-        margin: { left: margin, right: margin },
-        headStyles: { fillColor: TEAL, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 9 },
-        bodyStyles: { fontSize: 8, textColor: SLATE },
-        alternateRowStyles: { fillColor: [240, 248, 248] },
-      });
+      // Render each photo as a card-style block
+      for (let idx = 0; idx < photos.length; idx++) {
+        const p = photos[idx];
+        const itemRef = photoItemRefMap.get(p.id) || "-";
+        const caption = p.caption || "No caption";
+        const gps = p.gps_location || "N/A";
+        const dateStr = p.exif_date ? new Date(p.exif_date).toLocaleDateString("en-ZA") : p.upload_date ? new Date(p.upload_date).toLocaleDateString("en-ZA") : "N/A";
+        const imgData = photoImages[idx];
+
+        // Ensure space for photo block (image ~60mm + meta ~30mm)
+        yRef.y = ensureSpace(imgData ? 110 : 40, yRef.y);
+
+        // Photo header
+        doc.setFillColor(...TEAL);
+        doc.rect(margin, yRef.y, contentW, 8, "F");
+        doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(255, 255, 255);
+        doc.text(`Photo ${idx + 1} — ${itemRef}`, margin + 3, yRef.y + 5.5);
+        yRef.y += 10;
+
+        // Embed actual image
+        if (imgData) {
+          const imgFormat = imgData.includes("image/png") ? "PNG" : "JPEG";
+          const maxImgW = contentW - 10;
+          const maxImgH = 60;
+          try {
+            doc.addImage(imgData, imgFormat, margin + 5, yRef.y, maxImgW, maxImgH);
+            yRef.y += maxImgH + 3;
+          } catch {
+            doc.setFontSize(8); doc.setTextColor(...GREY);
+            doc.text("[Image could not be rendered]", margin + 5, yRef.y + 5);
+            yRef.y += 10;
+          }
+        } else {
+          doc.setFontSize(8); doc.setTextColor(...GREY);
+          doc.text("[No image available]", margin + 5, yRef.y + 5);
+          yRef.y += 10;
+        }
+
+        // Photo metadata table
+        (doc as any).autoTable({
+          startY: yRef.y,
+          body: [
+            [{ content: "Caption:", styles: { fontStyle: "bold" } }, caption],
+            [{ content: "Item Ref:", styles: { fontStyle: "bold" } }, itemRef],
+            [{ content: "GPS Location:", styles: { fontStyle: "bold" } }, gps],
+            [{ content: "Date:", styles: { fontStyle: "bold" } }, dateStr],
+          ],
+          theme: "grid",
+          margin: { left: margin, right: margin },
+          bodyStyles: { fontSize: 8, textColor: SLATE, cellPadding: 2 },
+          columnStyles: { 0: { cellWidth: 30 } },
+        });
+        yRef.y = (doc as any).lastAutoTable?.finalY + 10 || yRef.y + 10;
+      }
     } else {
       nothingToReport(yRef);
     }
