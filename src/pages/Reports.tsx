@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Download, Plus, Calendar, User, Loader2, Upload, Image } from 'lucide-react';
+import { FileText, Download, Calendar, User, Loader2, Upload, Image, FileDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuditInstances } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
@@ -8,6 +8,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import ProjectFilter from '@/components/ProjectFilter';
 import { Link } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function Reports() {
   const [generating, setGenerating] = useState<string | null>(null);
