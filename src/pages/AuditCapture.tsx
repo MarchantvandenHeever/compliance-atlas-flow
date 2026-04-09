@@ -86,7 +86,7 @@ export default function AuditCapture() {
         const status = r.status === 'NA' ? 'N/A' : r.status;
         mapped[r.checklist_item_id] = {
           id: r.id, status: status as ComplianceStatus, comments: r.comments || '', actions: r.actions || '',
-          photos: r.response_photos?.map((p: any) => ({ id: p.id, url: '', caption: p.caption || '', timestamp: p.upload_date, gpsLocation: p.gps_location })) || [],
+          photos: r.response_photos?.map((p: any) => ({ id: p.id, url: '', caption: p.caption || '', timestamp: p.upload_date, gpsLocation: p.gps_location, storagePath: p.storage_path || '' })) || [],
         };
       });
       setResponses(prev => ({ ...mapped, ...prev }));
@@ -144,7 +144,7 @@ export default function AuditCapture() {
     setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], actions } }));
   }, []);
   const handlePhotosChange = useCallback((itemId: string, photos: any[]) => {
-    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], photos } }));
+    setResponses(prev => ({ ...prev, [itemId]: { ...prev[itemId], photos: photos.map(p => ({ ...p, storagePath: p.storagePath || '' })) } }));
   }, []);
 
   const getFilteredItems = useCallback((objectiveId: string) => {
@@ -170,6 +170,27 @@ export default function AuditCapture() {
     const activeObjIds = objectives.filter(o => activeSectionIds.includes(o.sectionId)).map(o => o.id);
     return new Set(items.filter(i => 'objectiveId' in i ? activeObjIds.includes((i as any).objectiveId) : true).map(i => i.id));
   }, [items, sections, objectives, inactiveSections, has3Level]);
+
+  // Build global item number map for active items (sequential numbering for cross-referencing with photos)
+  const itemNumberMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    let num = 1;
+    for (const section of sections.filter(s => !inactiveSections.has(s.id))) {
+      const sectionObjs = objectives.filter(o => o.sectionId === section.id);
+      if (sectionObjs.length > 0) {
+        for (const obj of sectionObjs) {
+          for (const item of items.filter(i => (i as any).objectiveId === obj.id)) {
+            map[item.id] = num++;
+          }
+        }
+      } else {
+        for (const item of items.filter(i => (i as any).sectionId === section.id)) {
+          map[item.id] = num++;
+        }
+      }
+    }
+    return map;
+  }, [items, sections, objectives, inactiveSections]);
 
   const allResponses = useMemo(() => Object.values(responses).filter(r => r.status) as AuditItemResponse[], [responses]);
   const activeResponses = useMemo(() => {
@@ -214,6 +235,14 @@ export default function AuditCapture() {
         checklist_item_id: checklistItemId,
         status: (r.status === 'N/A' ? 'NA' : r.status) as 'C' | 'NC' | 'NA' | null,
         comments: r.comments || '', actions: r.actions || '',
+        photos: r.photos?.map(p => ({
+          id: p.id || '',
+          url: p.url || '',
+          caption: p.caption || '',
+          gpsLocation: p.gpsLocation,
+          exifDate: p.timestamp,
+          storagePath: (p as any).storagePath || '',
+        })) || [],
       }));
 
     const overrides = sections.map(s => ({ section_id: s.id, is_active: !inactiveSections.has(s.id) }));
@@ -505,6 +534,7 @@ export default function AuditCapture() {
                                   return (
                                     <div key={item.id} className="group">
                                       <div className="flex items-start gap-2 px-4 py-3 hover:bg-muted/20">
+                                        <span className="text-[10px] font-bold text-primary bg-primary/10 rounded px-1 py-0.5 mt-0.5 flex-shrink-0 min-w-[24px] text-center">#{itemNumberMap[item.id]}</span>
                                         <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${getStatusDotClass(response?.status as ComplianceStatus || null)}`} />
                                         <span className="text-xs text-muted-foreground w-10 flex-shrink-0 pt-0.5">{item.conditionRef}</span>
                                         <button onClick={() => toggleRow(item.id)} className="flex-1 text-left text-sm leading-relaxed min-w-0">
@@ -558,10 +588,10 @@ export default function AuditCapture() {
                                                   className="w-full px-3 py-2 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
                                               </div>
                                               <div className="md:col-span-2">
-                                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence</label>
+                                                <label className="text-xs font-medium text-muted-foreground mb-1 block">Photo Evidence (Item #{itemNumberMap[item.id]})</label>
                                                 <PhotoUpload responseId={response?.id || item.id}
-                                                  photos={response?.photos?.map(p => ({ url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: '' })) || []}
-                                                  onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation })))}
+                                                  photos={response?.photos?.map(p => ({ id: p.id, url: p.url, caption: p.caption, gpsLocation: p.gpsLocation, exifDate: p.timestamp, storagePath: (p as any).storagePath || '' })) || []}
+                                                  onPhotosChange={(photos) => handlePhotosChange(item.id, photos.map(p => ({ id: p.id || '', url: p.url, caption: p.caption, timestamp: p.exifDate || '', gpsLocation: p.gpsLocation, storagePath: p.storagePath })))}
                                                   disabled={isLocked} />
                                               </div>
                                             </div>
