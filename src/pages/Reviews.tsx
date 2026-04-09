@@ -72,6 +72,16 @@ function AuditReviewDetail({
     return set;
   }, [reviewComments]);
 
+  const inactiveSections = useMemo(() => {
+    const set = new Set<string>();
+    dbSectionOverrides?.forEach(o => { if (!o.is_active) set.add(o.section_id); });
+    return set;
+  }, [dbSectionOverrides]);
+
+  const sections = dbSections?.map(s => ({ id: s.id, name: s.name, source: s.source })) || [];
+  const objectives = dbObjectives?.map(o => ({ id: o.id, sectionId: o.section_id, name: o.name })) || [];
+  const items = dbItems?.map(i => ({ id: i.id, objectiveId: i.objective_id, description: i.description })) || [];
+
   // Count total active items for review progress
   const totalActiveItems = useMemo(() => {
     return items.filter(i => {
@@ -82,16 +92,6 @@ function AuditReviewDetail({
   }, [items, objectives, inactiveSections]);
 
   const reviewProgress = totalActiveItems > 0 ? Math.round((reviewedItemIds.size / totalActiveItems) * 100) : 0;
-
-  const inactiveSections = useMemo(() => {
-    const set = new Set<string>();
-    dbSectionOverrides?.forEach(o => { if (!o.is_active) set.add(o.section_id); });
-    return set;
-  }, [dbSectionOverrides]);
-
-  const sections = dbSections?.map(s => ({ id: s.id, name: s.name, source: s.source })) || [];
-  const objectives = dbObjectives?.map(o => ({ id: o.id, sectionId: o.section_id, name: o.name })) || [];
-  const items = dbItems?.map(i => ({ id: i.id, objectiveId: i.objective_id, description: i.description })) || [];
 
   const toggleSection = (id: string) => {
     setExpandedSections(prev => {
