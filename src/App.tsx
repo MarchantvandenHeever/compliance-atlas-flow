@@ -9,6 +9,7 @@ import AppLayout from "@/components/AppLayout";
 import Dashboard from "@/pages/Dashboard";
 import Projects from "@/pages/Projects";
 import AuditCapture from "@/pages/AuditCapture";
+import Audits from "@/pages/Audits";
 import Findings from "@/pages/Findings";
 import Analytics from "@/pages/Analytics";
 import Reports from "@/pages/Reports";

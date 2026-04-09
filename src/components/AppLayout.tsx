@@ -11,7 +11,7 @@ import NotificationBell from '@/components/NotificationBell';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/projects', icon: FolderKanban, label: 'Projects' },
-  { to: '/audit', icon: ClipboardCheck, label: 'Audit Capture' },
+  { to: '/audits', icon: ClipboardCheck, label: 'Audits' },
   { to: '/findings', icon: AlertTriangle, label: 'Findings & Actions' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
   { to: '/reports', icon: FileText, label: 'Reports' },
