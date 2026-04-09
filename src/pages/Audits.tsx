@@ -253,7 +253,7 @@ export default function Audits() {
                   <ClipboardCheck size={20} className="text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{audit.projects?.name || 'Unknown Project'}</p>
+                  <p className="font-medium text-sm truncate">{audit.name || audit.projects?.name || 'Unknown Project'}</p>
                   <p className="text-xs text-muted-foreground">{audit.projects?.client || ''} · {audit.period} · {audit.type}</p>
                 </div>
                 <Badge variant="outline" className={`${statusColors[audit.status] || ''} text-xs`}>
