@@ -4,6 +4,8 @@ import { Plus, ClipboardCheck, Search, Eye, Edit, Calendar, Filter } from 'lucid
 import { useAuditInstances, useCreateAudit } from '@/hooks/useAuditData';
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
+import { useMyProjectIds } from '@/hooks/useProjectTeam';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +33,9 @@ export default function Audits() {
   const { data: audits, isLoading } = useAuditInstances();
   const { data: projects } = useProjects();
   const { data: allPT } = useAllProjectTemplates();
+  const { hasRole } = useAuth();
+  const isAdmin = hasRole('admin');
+  const { data: myProjectIds } = useMyProjectIds();
   const createAudit = useCreateAudit();
 
   const [search, setSearch] = useState('');
@@ -53,9 +58,15 @@ export default function Audits() {
     return allPT.filter((pt: any) => pt.project_id === newProjectId);
   }, [newProjectId, allPT]);
 
-  const filtered = useMemo(() => {
+  const roleFilteredAudits = useMemo(() => {
     if (!audits) return [];
-    return audits.filter((a: any) => {
+    // Admins see all; others see only their assigned projects
+    if (isAdmin || !myProjectIds) return audits;
+    return audits.filter((a: any) => myProjectIds.includes(a.project_id));
+  }, [audits, isAdmin, myProjectIds]);
+
+  const filtered = useMemo(() => {
+    return roleFilteredAudits.filter((a: any) => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       if (projectFilter !== 'all' && a.project_id !== projectFilter) return false;
       if (search) {
@@ -66,19 +77,19 @@ export default function Audits() {
       }
       return true;
     });
-  }, [audits, statusFilter, projectFilter, search]);
+  }, [roleFilteredAudits, statusFilter, projectFilter, search]);
 
   // Summary counts
   const counts = useMemo(() => {
-    if (!audits) return { total: 0, draft: 0, submitted: 0, approved: 0, underReview: 0 };
+    const src = roleFilteredAudits;
     return {
-      total: audits.length,
-      draft: audits.filter((a: any) => a.status === 'draft').length,
-      submitted: audits.filter((a: any) => a.status === 'submitted').length,
-      approved: audits.filter((a: any) => a.status === 'approved').length,
-      underReview: audits.filter((a: any) => ['under_review', 'amendments_requested'].includes(a.status)).length,
+      total: src.length,
+      draft: src.filter((a: any) => a.status === 'draft').length,
+      submitted: src.filter((a: any) => a.status === 'submitted').length,
+      approved: src.filter((a: any) => a.status === 'approved').length,
+      underReview: src.filter((a: any) => ['under_review', 'amendments_requested'].includes(a.status)).length,
     };
-  }, [audits]);
+  }, [roleFilteredAudits]);
 
   const handleCreate = async () => {
     if (!newProjectId || !newTemplateId || !newPeriod) {
