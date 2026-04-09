@@ -87,6 +87,8 @@ Deno.serve(async (req) => {
     let previousAuditData: any = null;
     let previousResponses: any[] = [];
     let revisionLog: any[] = [];
+    let reportReview: any = null;
+    let reviewerName = reviewer;
 
     if (auditId) {
       const { data: audit } = await supabase
