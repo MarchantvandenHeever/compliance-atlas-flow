@@ -481,7 +481,7 @@ Deno.serve(async (req) => {
 
     const teamBody: any[] = [
       ["Environmental Control Officer (ECO):", author, "Report Writer"],
-      ["Senior ECO / Reviewer:", reviewer, "Reviewer"],
+      ["Senior ECO / Reviewer:", reviewerName, "Reviewer"],
     ];
 
     (doc as any).autoTable({
