@@ -19,6 +19,7 @@ const navItems = [
   { to: '/users', icon: Shield, label: 'Users' },
   { to: '/onboarding', icon: UserPlus, label: 'Client Onboarding', adminOnly: true },
   { to: '/reviews', icon: Eye, label: 'Audit Reviews', reviewerOnly: true },
+  { to: '/report-reviews', icon: FileText, label: 'Report Reviews', reviewerOnly: true },
 ] as const;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
