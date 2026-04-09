@@ -7,7 +7,7 @@ import { useSubmitForReview, useReviewComments, useResolveReviewComment } from '
 import { useProjects } from '@/hooks/useProjects';
 import { useAllProjectTemplates } from '@/hooks/useProjectTemplates';
 import { calculateCompliance, getStatusDotClass } from '@/lib/compliance';
-import { ComplianceStatus, AuditItemResponse } from '@/types';
+import { ComplianceStatus, AuditItemResponse, NCSeverity } from '@/types';
 import PhotoUpload from '@/components/PhotoUpload';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { defaultTemplate } from '@/data/checklistData';
@@ -16,6 +16,12 @@ const STATUS_OPTIONS: { value: ComplianceStatus; label: string; shortLabel: stri
   { value: 'C', label: 'Compliant', shortLabel: 'C', color: 'bg-green-500 hover:bg-green-600 text-white' },
   { value: 'NC', label: 'Non-Compliant', shortLabel: 'NC', color: 'bg-red-500 hover:bg-red-600 text-white' },
   { value: 'N/A', label: 'N/A / Noted', shortLabel: 'N/A', color: 'bg-gray-400 hover:bg-gray-500 text-white' },
+];
+
+const SEVERITY_OPTIONS: { value: NCSeverity; label: string; color: string }[] = [
+  { value: 'low', label: 'Low', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+  { value: 'medium', label: 'Medium', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+  { value: 'high', label: 'High', color: 'bg-red-100 text-red-800 border-red-300' },
 ];
 
 export default function AuditCapture() {
