@@ -163,7 +163,7 @@ export default function Findings() {
                 <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-muted-foreground">
                   {finding.assignedTo && <div className="flex items-center gap-1"><User size={12} /> {finding.assignedTo}</div>}
                   {finding.targetDate && <div className="flex items-center gap-1"><Calendar size={12} /> Target: {finding.targetDate}</div>}
-                  <Link to={`/audit?projectId=${finding.projectId}&templateId=${finding.templateId}&auditId=${finding.auditId}`}
+                  <Link to={`/audits/capture?projectId=${finding.projectId}&templateId=${finding.templateId}&auditId=${finding.auditId}`}
                     className="flex items-center gap-1 text-primary hover:underline ml-auto">
                     <ExternalLink size={12} /> View in Audit
                   </Link>

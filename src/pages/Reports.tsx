@@ -162,7 +162,7 @@ function AuditReportRow({
           </Button>
         )}
 
-        <Link to={`/audit?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
+        <Link to={`/audits/capture?projectId=${audit.project_id}&templateId=${audit.template_id}&auditId=${audit.id}`}
           className="text-xs text-primary hover:underline">View Audit</Link>
 
         <DropdownMenu>
