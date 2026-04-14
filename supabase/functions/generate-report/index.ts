@@ -1252,7 +1252,7 @@ Deno.serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="CES_Audit_Report_${period.replace(/\s/g, "_")}.pdf"`,
+        "Content-Disposition": `attachment; filename="${projName.replace(/\s/g, "_")}_${period.replace(/\s/g, "_")}.pdf"`,
       },
     });
   } catch (error) {

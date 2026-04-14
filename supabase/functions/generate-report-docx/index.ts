@@ -1068,7 +1068,7 @@ Deno.serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "Content-Disposition": `attachment; filename="CES_Audit_Report_${period.replace(/\s/g, "_")}.docx"`,
+        "Content-Disposition": `attachment; filename="${projName.replace(/\s/g, "_")}_${period.replace(/\s/g, "_")}.docx"`,
       },
     });
   } catch (error) {
