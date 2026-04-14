@@ -21,6 +21,7 @@ import ClientOnboarding from "@/pages/ClientOnboarding";
 import Reviews from "@/pages/Reviews";
 import ReportReviews from "@/pages/ReportReviews";
 import ClientDashboard from "@/pages/ClientDashboard";
+import Profile from "@/pages/Profile";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
                       <Route path="/reviews" element={<Reviews />} />
                       <Route path="/report-reviews" element={<ReportReviews />} />
                       <Route path="/client-dashboard" element={<ClientDashboard />} />
+                      <Route path="/profile" element={<Profile />} />
                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AppLayout>

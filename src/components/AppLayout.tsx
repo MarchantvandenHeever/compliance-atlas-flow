@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye, User
 } from 'lucide-react';
+import { useNavigate as useNavRoute } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import cesLogo from '@/assets/ces-logo.png';
 import NotificationBell from '@/components/NotificationBell';
@@ -126,13 +127,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {!collapsed && (
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
-                <span className="text-xs font-medium">{initials}</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{profile?.display_name || 'User'}</p>
-                <p className="text-[10px] text-sidebar-foreground/60">{roleLabel}</p>
-              </div>
+              <button
+                onClick={() => navigate('/profile')}
+                className="flex items-center gap-3 min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                title="View profile"
+              >
+                <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center">
+                  <span className="text-xs font-medium">{initials}</span>
+                </div>
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="text-sm font-medium truncate">{profile?.display_name || 'User'}</p>
+                  <p className="text-[10px] text-sidebar-foreground/60">{roleLabel}</p>
+                </div>
+              </button>
               <button
                 onClick={signOut}
                 className="text-sidebar-foreground/40 hover:text-sidebar-foreground p-1 transition-colors"
