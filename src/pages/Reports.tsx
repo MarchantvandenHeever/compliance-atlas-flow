@@ -101,7 +101,7 @@ function AuditReportRow({
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `CES_Audit_${audit.period.replace(/\s/g, '_')}.${format}`;
+      a.download = `${(project?.name || 'Report').replace(/\s+/g, '_')}_${audit.period.replace(/\s/g, '_')}.${format}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

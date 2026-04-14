@@ -178,7 +178,7 @@ export default function ClientDashboard() {
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `report.${format}`;
+    a.download = `${(selectedProject?.name || 'Report').replace(/\s+/g, '_')}_${selectedAudit?.period?.replace(/\s/g, '_') || 'report'}.${format}`;
     a.click();
     URL.revokeObjectURL(url);
   };
