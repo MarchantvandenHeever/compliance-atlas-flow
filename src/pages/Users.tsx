@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, UserPlus, X, Building2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Shield, UserPlus, X, Building2, Mail, Copy, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -28,6 +31,13 @@ export default function Users() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [addingRole, setAddingRole] = useState<Record<string, AppRole | ''>>({});
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteDisplayName, setInviteDisplayName] = useState('');
+  const [inviteRole, setInviteRole] = useState<AppRole | ''>('');
+  const [inviteOrgId, setInviteOrgId] = useState<string>('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
 
   const { data: profiles, isLoading: loadingProfiles } = useQuery({
     queryKey: ['admin-profiles'],
@@ -101,14 +111,171 @@ export default function Users() {
   const getUserRoles = (userId: string): AppRole[] =>
     (roles || []).filter(r => r.user_id === userId).map(r => r.role);
 
+  const handleInviteUser = async () => {
+    if (!inviteEmail || !inviteDisplayName) {
+      toast({ title: 'Email and display name are required', variant: 'destructive' });
+      return;
+    }
+    setInviting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      
+      const response = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: inviteEmail,
+          displayName: inviteDisplayName,
+          role: inviteRole || undefined,
+          organisationId: inviteOrgId || undefined,
+        },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      
+      const result = response.data;
+      if (result.error) throw new Error(result.error);
+
+      setInviteResult({ email: inviteEmail, tempPassword: result.tempPassword });
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-roles'] });
+      toast({ title: 'User invited successfully' });
+    } catch (e: any) {
+      toast({ title: 'Error inviting user', description: e.message, variant: 'destructive' });
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const resetInviteForm = () => {
+    setInviteEmail('');
+    setInviteDisplayName('');
+    setInviteRole('');
+    setInviteOrgId('');
+    setInviteResult(null);
+    setInviteOpen(false);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: 'Copied to clipboard' });
+  };
+
   const loading = loadingProfiles || loadingRoles;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <Shield className="h-6 w-6 text-primary" />
-        <h1 className="text-2xl font-bold text-foreground">User Management</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Shield className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-bold text-foreground">User Management</h1>
+        </div>
+        <Button onClick={() => setInviteOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Invite User
+        </Button>
       </div>
+
+      {/* Invite User Dialog */}
+      <Dialog open={inviteOpen} onOpenChange={(open) => { if (!open) resetInviteForm(); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{inviteResult ? 'User Created' : 'Invite New User'}</DialogTitle>
+            <DialogDescription>
+              {inviteResult
+                ? 'Share the temporary credentials below with the new user. They will be prompted to change their password on first login.'
+                : 'Create a new user account with a temporary password.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {inviteResult ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Email</p>
+                    <p className="font-medium text-sm">{inviteResult.email}</p>
+                  </div>
+                  <Button size="icon" variant="ghost" onClick={() => copyToClipboard(inviteResult.email)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Temporary Password</p>
+                    <p className="font-mono font-medium text-sm">{inviteResult.tempPassword}</p>
+                  </div>
+                  <Button size="icon" variant="ghost" onClick={() => copyToClipboard(inviteResult.tempPassword)}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={resetInviteForm} className="w-full">Done</Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-email">Email Address</Label>
+                <Input
+                  id="invite-email"
+                  type="email"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="user@example.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-name">Display Name</Label>
+                <Input
+                  id="invite-name"
+                  value={inviteDisplayName}
+                  onChange={(e) => setInviteDisplayName(e.target.value)}
+                  placeholder="John Doe"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Role (optional)</Label>
+                <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as AppRole)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ALL_ROLES.map(r => (
+                      <SelectItem key={r} value={r}>{roleLabel(r)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Organisation (optional)</Label>
+                <Select value={inviteOrgId} onValueChange={setInviteOrgId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select organisation..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {organisations.map(org => (
+                      <SelectItem key={org.id} value={org.id}>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="h-3 w-3 text-muted-foreground" />
+                          {org.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={resetInviteForm}>Cancel</Button>
+                <Button onClick={handleInviteUser} disabled={inviting || !inviteEmail || !inviteDisplayName}>
+                  {inviting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Create User
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardHeader>
