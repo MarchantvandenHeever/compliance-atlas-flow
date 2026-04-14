@@ -291,11 +291,7 @@ function AuditReviewDetail({
                                               </div>
                                             </div>
                                             {/* Photo evidence count */}
-                                            {response?.response_photos && response.response_photos.length > 0 && (
-                                              <p className="text-[10px] text-primary font-medium">
-                                                📷 {response.response_photos.length} photo(s) attached
-                                              </p>
-                                            )}
+                                            <PhotoEvidenceGallery photos={response.response_photos} />
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
