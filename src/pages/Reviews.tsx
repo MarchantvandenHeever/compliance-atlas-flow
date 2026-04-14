@@ -1,9 +1,13 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, MessageSquare,
-  Loader2, Eye, ChevronDown, ChevronRight, ArrowLeft, XCircle
+  Loader2, Eye, ChevronDown, ChevronRight, ArrowLeft, XCircle,
+  X, ZoomIn, Download, MapPin, Clock, Camera
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import PhotoEvidenceGallery from '@/components/PhotoEvidenceGallery';
 import { useAuditInstances, useAuditResponses, useAuditSectionOverrides } from '@/hooks/useAuditData';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
 import { useProjects } from '@/hooks/useProjects';
@@ -288,11 +292,7 @@ function AuditReviewDetail({
                                               </div>
                                             </div>
                                             {/* Photo evidence count */}
-                                            {response?.response_photos && response.response_photos.length > 0 && (
-                                              <p className="text-[10px] text-primary font-medium">
-                                                📷 {response.response_photos.length} photo(s) attached
-                                              </p>
-                                            )}
+                                            <PhotoEvidenceGallery photos={response.response_photos} />
                                           </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
