@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
-  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye
+  AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye, User
 } from 'lucide-react';
+import { useNavigate as useNavRoute } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import cesLogo from '@/assets/ces-logo.png';
 import NotificationBell from '@/components/NotificationBell';
