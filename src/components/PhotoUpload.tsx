@@ -39,7 +39,6 @@ async function extractMetadata(file: File): Promise<ExtractedMeta> {
       gps: true,
       tiff: true,
       exif: true,
-      ifd0: true,
       pick: [
         'DateTimeOriginal', 'CreateDate', 'ModifyDate',
         'Make', 'Model',
@@ -47,7 +46,7 @@ async function extractMetadata(file: File): Promise<ExtractedMeta> {
         'ImageWidth', 'ImageHeight', 'ExifImageWidth', 'ExifImageHeight',
         'Orientation',
       ],
-    });
+    } as any);
 
     if (!exif) return result;
 
