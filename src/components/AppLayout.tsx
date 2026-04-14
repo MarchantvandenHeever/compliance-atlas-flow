@@ -96,13 +96,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          {navItems
-            .filter(item => {
-              if ('adminOnly' in item && item.adminOnly) return roles.includes('admin');
-              if ('reviewerOnly' in item && item.reviewerOnly) return roles.includes('reviewer') || roles.includes('admin');
-              return true;
-            })
-            .map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
