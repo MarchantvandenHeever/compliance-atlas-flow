@@ -60,6 +60,22 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
   const { data: comments } = useReportReviewComments(review?.id);
   const { data: versions } = useReportVersions(review?.id);
 
+  // Fetch audit photos for evidence gallery
+  const [auditPhotos, setAuditPhotos] = useState<any[]>([]);
+  const [showPhotos, setShowPhotos] = useState(false);
+
+  useState(() => {
+    if (!auditId) return;
+    supabase
+      .from('audit_item_responses')
+      .select('id, checklist_item_id, response_photos(*)')
+      .eq('audit_id', auditId)
+      .then(({ data }) => {
+        const allPhotos = (data || []).flatMap((r: any) => r.response_photos || []);
+        setAuditPhotos(allPhotos);
+      });
+  });
+
   const updateStatus = useUpdateReportReviewStatus();
   const addComment = useAddReportReviewComment();
   const resolveComment = useResolveReportReviewComment();
