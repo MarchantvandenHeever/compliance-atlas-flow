@@ -260,7 +260,7 @@ export default function ClientDashboard() {
                       {audit.status.replace(/_/g, ' ')}
                     </span>
                     {!isApproved && (
-                      <Lock size={14} className="text-muted-foreground" title="Details available after approval" />
+                      <span title="Details available after approval"><Lock size={14} className="text-muted-foreground" /></span>
                     )}
                   </div>
                 );
