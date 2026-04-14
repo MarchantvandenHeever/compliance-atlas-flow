@@ -42,7 +42,7 @@ export default function Users() {
   const [inviteOrgId, setInviteOrgId] = useState<string>('');
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
-
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; name: string } | null>(null);
   const { data: profiles, isLoading: loadingProfiles } = useQuery({
     queryKey: ['admin-profiles'],
     queryFn: async () => {
