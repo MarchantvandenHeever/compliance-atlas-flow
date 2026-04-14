@@ -23,24 +23,40 @@ export default function ClientDashboard() {
   const [selectedProject, setSelectedProject] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
 
-  // Fetch projects for this client's organisation
-  const { data: projects = [] } = useQuery({
-    queryKey: ['client-projects', profile?.organisation_id],
+  // Fetch project IDs the client user is assigned to
+  const { data: myProjectIds = [] } = useQuery({
+    queryKey: ['client-team-projects', user?.id],
     queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_team_members')
+        .select('project_id')
+        .eq('user_id', user!.id)
+        .eq('project_role', 'client');
+      if (error) throw error;
+      return data.map(d => d.project_id);
+    },
+    enabled: !!user,
+  });
+
+  // Fetch only assigned projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ['client-projects', myProjectIds],
+    queryFn: async () => {
+      if (myProjectIds.length === 0) return [];
       const { data, error } = await supabase
         .from('projects')
         .select('*')
-        .eq('organisation_id', profile!.organisation_id!)
+        .in('id', myProjectIds)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.organisation_id,
+    enabled: myProjectIds.length > 0,
   });
 
   // Fetch approved audits only
   const { data: approvedAudits = [] } = useQuery({
-    queryKey: ['client-approved-audits', profile?.organisation_id, selectedProject],
+    queryKey: ['client-approved-audits', myProjectIds, selectedProject],
     queryFn: async () => {
       let query = supabase
         .from('audit_instances')
@@ -51,8 +67,7 @@ export default function ClientDashboard() {
       if (selectedProject) {
         query = query.eq('project_id', selectedProject);
       } else {
-        const projectIds = projects.map(p => p.id);
-        if (projectIds.length > 0) query = query.in('project_id', projectIds);
+        if (myProjectIds.length > 0) query = query.in('project_id', myProjectIds);
         else return [];
       }
 
@@ -60,12 +75,12 @@ export default function ClientDashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.organisation_id && projects.length > 0,
+    enabled: myProjectIds.length > 0,
   });
 
   // Fetch all audits (for status overview, not detailed data)
   const { data: allAudits = [] } = useQuery({
-    queryKey: ['client-all-audits', profile?.organisation_id, selectedProject],
+    queryKey: ['client-all-audits', myProjectIds, selectedProject],
     queryFn: async () => {
       let query = supabase
         .from('audit_instances')
@@ -75,8 +90,7 @@ export default function ClientDashboard() {
       if (selectedProject) {
         query = query.eq('project_id', selectedProject);
       } else {
-        const projectIds = projects.map(p => p.id);
-        if (projectIds.length > 0) query = query.in('project_id', projectIds);
+        if (myProjectIds.length > 0) query = query.in('project_id', myProjectIds);
         else return [];
       }
 
@@ -84,7 +98,7 @@ export default function ClientDashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.organisation_id && projects.length > 0,
+    enabled: myProjectIds.length > 0,
   });
 
   // Fetch responses for approved audits
