@@ -4,6 +4,8 @@ import {
   CheckCircle, XCircle, MessageSquare, Upload, Download, Clock,
   FileText, History, AlertTriangle, Loader2, Send, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import PhotoEvidenceGallery from '@/components/PhotoEvidenceGallery';
+import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';

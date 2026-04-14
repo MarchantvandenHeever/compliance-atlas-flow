@@ -941,18 +941,16 @@ Deno.serve(async (req) => {
     }));
 
     if (photos.length > 0) {
-      // Fetch actual photo images from storage
-      const storageBase = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/`;
+      // Fetch actual photo images using service role (bucket is private)
       const photoBuffers: (Uint8Array | null)[] = [];
       for (const p of photos) {
         if (p.storage_path) {
           try {
-            const res = await fetch(storageBase + p.storage_path);
-            if (res.ok) {
-              photoBuffers.push(new Uint8Array(await res.arrayBuffer()));
-            } else {
-              photoBuffers.push(null);
-            }
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from("audit-photos")
+              .download(p.storage_path);
+            if (dlErr || !blob) { photoBuffers.push(null); continue; }
+            photoBuffers.push(new Uint8Array(await blob.arrayBuffer()));
           } catch {
             photoBuffers.push(null);
           }
