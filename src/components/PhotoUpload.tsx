@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react';
-import { Camera, Upload, X, MapPin, Clock } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Camera, Upload, X, MapPin, Clock, ImageIcon, Compass, Smartphone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import exifr from 'exifr';
 
 interface PhotoData {
   id?: string;
@@ -19,81 +20,85 @@ interface PhotoUploadProps {
   disabled?: boolean;
 }
 
-// Extract EXIF data from image file
-async function extractExif(file: File): Promise<{ gps?: string; date?: string }> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const view = new DataView(e.target?.result as ArrayBuffer);
-        // Check for JPEG
-        if (view.getUint16(0) !== 0xFFD8) {
-          resolve({});
-          return;
-        }
-
-        let offset = 2;
-        while (offset < view.byteLength) {
-          const marker = view.getUint16(offset);
-          if (marker === 0xFFE1) {
-            // EXIF marker found
-            const exifData = parseExifSegment(view, offset + 4);
-            resolve(exifData);
-            return;
-          }
-          offset += 2 + view.getUint16(offset + 2);
-        }
-        resolve({});
-      } catch {
-        resolve({});
-      }
-    };
-    reader.readAsArrayBuffer(file.slice(0, 128 * 1024)); // Read first 128KB for EXIF
-  });
+interface ExtractedMeta {
+  gps?: string;
+  date?: string;
+  cameraMake?: string;
+  cameraModel?: string;
+  orientation?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  altitude?: number;
+  direction?: number;
 }
 
-function parseExifSegment(view: DataView, start: number): { gps?: string; date?: string } {
+async function extractMetadata(file: File): Promise<ExtractedMeta> {
+  const result: ExtractedMeta = {};
   try {
-    // Basic EXIF parsing - look for DateTimeOriginal and GPS
-    const exifStr = String.fromCharCode(...new Uint8Array(view.buffer.slice(start, start + 4)));
-    if (exifStr !== 'Exif') return {};
+    const exif = await exifr.parse(file, {
+      gps: true,
+      tiff: true,
+      exif: true,
+      ifd0: true,
+      pick: [
+        'DateTimeOriginal', 'CreateDate', 'ModifyDate',
+        'Make', 'Model',
+        'GPSLatitude', 'GPSLongitude', 'GPSAltitude', 'GPSImgDirection',
+        'ImageWidth', 'ImageHeight', 'ExifImageWidth', 'ExifImageHeight',
+        'Orientation',
+      ],
+    });
 
-    const tiffStart = start + 6;
-    const bigEndian = view.getUint16(tiffStart) === 0x4D4D;
+    if (!exif) return result;
 
-    const getUint16 = (o: number) => bigEndian ? view.getUint16(o) : view.getUint16(o, true);
-    const getUint32 = (o: number) => bigEndian ? view.getUint32(o) : view.getUint32(o, true);
-
-    let result: { gps?: string; date?: string } = {};
-
-    // Parse IFD0
-    const ifdOffset = tiffStart + getUint32(tiffStart + 4);
-    const entries = getUint16(ifdOffset);
-
-    for (let i = 0; i < entries; i++) {
-      const entryOffset = ifdOffset + 2 + i * 12;
-      const tag = getUint16(entryOffset);
-
-      // DateTimeOriginal tag in SubIFD (0x9003) or DateTime (0x0132)
-      if (tag === 0x0132) {
-        const valueOffset = tiffStart + getUint32(entryOffset + 8);
-        const dateStr = String.fromCharCode(
-          ...new Uint8Array(view.buffer.slice(valueOffset, valueOffset + 19))
-        );
-        result.date = dateStr.replace(/(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
-      }
+    // GPS
+    if (exif.latitude != null && exif.longitude != null) {
+      result.gps = `${exif.latitude.toFixed(6)}, ${exif.longitude.toFixed(6)}`;
+    }
+    if (exif.GPSAltitude != null) {
+      result.altitude = Math.round(exif.GPSAltitude);
+    }
+    if (exif.GPSImgDirection != null) {
+      result.direction = Math.round(exif.GPSImgDirection);
     }
 
-    return result;
+    // Date
+    const dateVal = exif.DateTimeOriginal || exif.CreateDate || exif.ModifyDate;
+    if (dateVal) {
+      result.date = dateVal instanceof Date ? dateVal.toISOString() : String(dateVal);
+    }
+
+    // Camera
+    if (exif.Make) result.cameraMake = String(exif.Make).trim();
+    if (exif.Model) result.cameraModel = String(exif.Model).trim();
+
+    // Dimensions
+    result.imageWidth = exif.ExifImageWidth || exif.ImageWidth;
+    result.imageHeight = exif.ExifImageHeight || exif.ImageHeight;
+    result.orientation = exif.Orientation;
   } catch {
-    return {};
+    // EXIF parsing failed — non-critical
   }
+  return result;
 }
 
 export default function PhotoUpload({ responseId, photos, onPhotosChange, disabled }: PhotoUploadProps) {
   const [uploading, setUploading] = useState(false);
+  const [hasCamera, setHasCamera] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect camera availability
+  useEffect(() => {
+    if (navigator.mediaDevices?.enumerateDevices) {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+        setHasCamera(devices.some(d => d.kind === 'videoinput'));
+      }).catch(() => setHasCamera(false));
+    } else {
+      // Fallback: show camera button on mobile/tablet (touch devices)
+      setHasCamera('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    }
+  }, []);
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -113,20 +118,34 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
           continue;
         }
 
-        // Extract EXIF
-        const exif = await extractExif(file);
+        // Extract comprehensive EXIF metadata
+        const meta = await extractMetadata(file);
 
-        // Get GPS from browser if EXIF GPS not available
-        let gpsLocation = exif.gps;
+        // Fallback to browser geolocation if EXIF GPS unavailable
+        let gpsLocation = meta.gps;
         if (!gpsLocation && navigator.geolocation) {
           try {
             const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 30000,
+              });
             });
             gpsLocation = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+            if (pos.coords.altitude != null && !meta.altitude) {
+              meta.altitude = Math.round(pos.coords.altitude);
+            }
           } catch {
             // GPS unavailable
           }
+        }
+
+        // Build caption with camera info
+        let autoCaption = '';
+        if (meta.cameraMake || meta.cameraModel) {
+          const cam = [meta.cameraMake, meta.cameraModel].filter(Boolean).join(' ');
+          autoCaption = cam;
         }
 
         // Upload to Supabase Storage
@@ -146,9 +165,9 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
 
         newPhotos.push({
           url: signedUrlData?.signedUrl || '',
-          caption: '',
+          caption: autoCaption,
           gpsLocation,
-          exifDate: exif.date || new Date().toISOString(),
+          exifDate: meta.date || new Date().toISOString(),
           storagePath: path,
         });
       }
@@ -182,14 +201,16 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
     <div className="space-y-2">
       {/* Upload buttons */}
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => cameraInputRef.current?.click()}
-          disabled={disabled || uploading}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md border bg-background text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
-        >
-          <Camera size={12} /> Camera
-        </button>
+        {hasCamera && (
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={disabled || uploading}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            <Camera size={12} /> Take Photo
+          </button>
+        )}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -213,7 +234,7 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
         accept="image/*"
         multiple
         className="hidden"
-        onChange={e => handleFileSelect(e.target.files)}
+        onChange={e => { handleFileSelect(e.target.files); e.target.value = ''; }}
       />
       <input
         ref={cameraInputRef}
@@ -221,7 +242,7 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
         accept="image/*"
         capture="environment"
         className="hidden"
-        onChange={e => handleFileSelect(e.target.files)}
+        onChange={e => { handleFileSelect(e.target.files); e.target.value = ''; }}
       />
 
       {/* Photo thumbnails */}
@@ -252,12 +273,12 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
                   disabled={disabled}
                   className="w-full text-[10px] px-1 py-0.5 bg-transparent border-b border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
                 />
-                <div className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                <div className="flex items-center gap-2 text-[9px] text-muted-foreground flex-wrap">
                   {photo.gpsLocation && (
                     <span className="flex items-center gap-0.5"><MapPin size={8} /> {photo.gpsLocation}</span>
                   )}
                   {photo.exifDate && (
-                    <span className="flex items-center gap-0.5"><Clock size={8} /> {new Date(photo.exifDate).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-0.5"><Clock size={8} /> {new Date(photo.exifDate).toLocaleString()}</span>
                   )}
                 </div>
               </div>
