@@ -35,9 +35,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isClientOnly = roles.length > 0 && roles.every(r => r === 'client_viewer');
 
-  // Redirect client-only users to client dashboard
+  // Force client-only users to client dashboard — they cannot access any other page
   useEffect(() => {
-    if (isClientOnly && location.pathname === '/') {
+    if (isClientOnly && location.pathname !== '/client-dashboard') {
       navigate('/client-dashboard', { replace: true });
     }
   }, [isClientOnly, location.pathname, navigate]);
