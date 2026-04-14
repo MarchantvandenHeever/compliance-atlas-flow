@@ -151,7 +151,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex-1">
             <h1 className="text-sm font-medium text-foreground">
-              {navItems.find(n => location.pathname === n.to || location.pathname.startsWith(n.to + '/'))?.label || 'ECO Monitor'}
+              {[...navItems, ...clientNavItems].find(n => location.pathname === n.to || location.pathname.startsWith(n.to + '/'))?.label || 'ECO Monitor'}
             </h1>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
