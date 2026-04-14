@@ -3,16 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export function useProjects() {
+export function useProjects(status?: string) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['projects'],
+    queryKey: ['projects', status],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select('*, checklist_templates(name, version)')
         .order('created_at', { ascending: false });
+      if (status) {
+        query = query.eq('status', status);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -48,6 +52,48 @@ export function useCreateProject() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project created');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useUpdateProjectStatus() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ projectId, status }: { projectId: string; status: 'active' | 'completed' | 'on_hold' }) => {
+      const { data, error } = await supabase
+        .from('projects')
+        .update({ status })
+        .eq('id', projectId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      const label = vars.status === 'completed' ? 'archived' : vars.status === 'active' ? 'reopened' : 'updated';
+      toast.success(`Project ${label} successfully`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (projectId: string) => {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', projectId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('Project deleted');
     },
     onError: (e: Error) => toast.error(e.message),
   });
