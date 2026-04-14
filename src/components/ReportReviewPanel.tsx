@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle, XCircle, MessageSquare, Upload, Download, Clock,
@@ -64,7 +64,7 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
   const [auditPhotos, setAuditPhotos] = useState<any[]>([]);
   const [showPhotos, setShowPhotos] = useState(false);
 
-  useState(() => {
+  useEffect(() => {
     if (!auditId) return;
     supabase
       .from('audit_item_responses')
@@ -74,7 +74,7 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
         const allPhotos = (data || []).flatMap((r: any) => r.response_photos || []);
         setAuditPhotos(allPhotos);
       });
-  });
+  }, [auditId]);
 
   const updateStatus = useUpdateReportReviewStatus();
   const addComment = useAddReportReviewComment();
