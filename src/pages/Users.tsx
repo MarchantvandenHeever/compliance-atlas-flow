@@ -10,7 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Shield, UserPlus, X, Building2, Mail, Copy, Loader2 } from 'lucide-react';
+import { Shield, UserPlus, X, Building2, Mail, Copy, Loader2, Trash2 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -38,7 +42,7 @@ export default function Users() {
   const [inviteOrgId, setInviteOrgId] = useState<string>('');
   const [inviting, setInviting] = useState(false);
   const [inviteResult, setInviteResult] = useState<{ email: string; tempPassword: string } | null>(null);
-
+  const [deleteTarget, setDeleteTarget] = useState<{ userId: string; name: string } | null>(null);
   const { data: profiles, isLoading: loadingProfiles } = useQuery({
     queryKey: ['admin-profiles'],
     queryFn: async () => {
@@ -106,6 +110,23 @@ export default function Users() {
       toast({ title: 'Client assignment updated' });
     },
     onError: (e: Error) => toast({ title: 'Error assigning client', description: e.message, variant: 'destructive' }),
+  });
+
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      });
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-roles'] });
+      toast({ title: 'User deleted successfully' });
+      setDeleteTarget(null);
+    },
+    onError: (e: Error) => toast({ title: 'Error deleting user', description: e.message, variant: 'destructive' }),
   });
 
   const getUserRoles = (userId: string): AppRole[] =>
@@ -293,8 +314,9 @@ export default function Users() {
                   <TableHead>Name</TableHead>
                   <TableHead>Current Roles</TableHead>
                   <TableHead>Assign Role</TableHead>
-                  <TableHead>Client Organisation</TableHead>
-                </TableRow>
+                   <TableHead>Client Organisation</TableHead>
+                   <TableHead className="w-[60px]"></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(profiles || []).map(profile => {
@@ -404,7 +426,19 @@ export default function Users() {
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </TableCell>
+                       </TableCell>
+                       <TableCell>
+                         {profile.user_id !== user?.id && (
+                           <Button
+                             size="icon"
+                             variant="ghost"
+                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                             onClick={() => setDeleteTarget({ userId: profile.user_id, name: profile.display_name || 'this user' })}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         )}
+                       </TableCell>
                     </TableRow>
                   );
                 })}
@@ -413,6 +447,29 @@ export default function Users() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete User</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone and will remove all their data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteUser.mutate(deleteTarget.userId)}
+              disabled={deleteUser.isPending}
+            >
+              {deleteUser.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
