@@ -1,9 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardCheck, CheckCircle2, AlertTriangle, MessageSquare,
-  Loader2, Eye, ChevronDown, ChevronRight, ArrowLeft, XCircle
+  Loader2, Eye, ChevronDown, ChevronRight, ArrowLeft, XCircle,
+  X, ZoomIn, Download, MapPin, Clock, Camera
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { useAuditInstances, useAuditResponses, useAuditSectionOverrides } from '@/hooks/useAuditData';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
 import { useProjects } from '@/hooks/useProjects';
