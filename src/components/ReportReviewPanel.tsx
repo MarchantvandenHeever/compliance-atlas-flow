@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle, XCircle, MessageSquare, Upload, Download, Clock,
   FileText, History, AlertTriangle, Loader2, Send, ChevronDown, ChevronUp,
 } from 'lucide-react';
+import PhotoEvidenceGallery from '@/components/PhotoEvidenceGallery';
+import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,6 +59,22 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
   const { data: review } = useReportReview(auditId);
   const { data: comments } = useReportReviewComments(review?.id);
   const { data: versions } = useReportVersions(review?.id);
+
+  // Fetch audit photos for evidence gallery
+  const [auditPhotos, setAuditPhotos] = useState<any[]>([]);
+  const [showPhotos, setShowPhotos] = useState(false);
+
+  useEffect(() => {
+    if (!auditId) return;
+    supabase
+      .from('audit_item_responses')
+      .select('id, checklist_item_id, response_photos(*)')
+      .eq('audit_id', auditId)
+      .then(({ data }) => {
+        const allPhotos = (data || []).flatMap((r: any) => r.response_photos || []);
+        setAuditPhotos(allPhotos);
+      });
+  }, [auditId]);
 
   const updateStatus = useUpdateReportReviewStatus();
   const addComment = useAddReportReviewComment();
@@ -163,6 +181,18 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
             </Badge>
           )}
         </div>
+
+        {/* Photo Evidence */}
+        {auditPhotos.length > 0 && (
+          <div className="space-y-2 border rounded-lg p-3">
+            <button onClick={() => setShowPhotos(!showPhotos)}
+              className="flex items-center gap-1 text-sm font-semibold hover:text-primary transition-colors w-full">
+              📷 Audit Photo Evidence ({auditPhotos.length})
+              {showPhotos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {showPhotos && <PhotoEvidenceGallery photos={auditPhotos} />}
+          </div>
+        )}
 
         {/* Reviewer Actions */}
         {isReviewer && !isLocked && (

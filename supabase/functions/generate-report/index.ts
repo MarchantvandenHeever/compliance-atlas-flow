@@ -1169,13 +1169,20 @@ Deno.serve(async (req) => {
     doc.text("Appendix B — Photo Evidence", margin, yRef.y); yRef.y += 3; drawHR(yRef.y); yRef.y += 10;
 
     if (photos.length > 0) {
-      // Fetch actual photo images
-      const storageBase = `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/audit-photos/`;
+      // Fetch actual photo images using service role (bucket is private)
       const photoImages: (string | null)[] = [];
       for (const p of photos) {
         if (p.storage_path) {
-          const imgData = await fetchImageBase64(storageBase + p.storage_path);
-          photoImages.push(imgData);
+          try {
+            const { data: blob, error: dlErr } = await supabase.storage
+              .from("audit-photos")
+              .download(p.storage_path);
+            if (dlErr || !blob) { photoImages.push(null); continue; }
+            const buf = new Uint8Array(await blob.arrayBuffer());
+            const b64 = btoa(String.fromCharCode(...buf));
+            const ct = blob.type || "image/jpeg";
+            photoImages.push(`data:${ct};base64,${b64}`);
+          } catch { photoImages.push(null); }
         } else {
           photoImages.push(null);
         }
