@@ -31,9 +31,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile, roles, signOut } = useAuth();
+  const { profile, roles, signOut, loading } = useAuth();
 
-  const isClientOnly = roles.length > 0 && roles.every(r => r === 'client_viewer');
+  const rolesLoaded = !loading && roles.length > 0;
+  const isClientOnly = rolesLoaded && roles.every(r => r === 'client_viewer');
 
   // Force client-only users to client dashboard — they cannot access any other page
   useEffect(() => {
