@@ -1,0 +1,1 @@
+ALTER TABLE public.organisations ADD COLUMN website_url text;
