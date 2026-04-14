@@ -28,6 +28,15 @@ interface ReportRequest {
   clientLogoUrl?: string;
 }
 
+function validateLogoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') return false;
+    const supabaseHost = new URL(Deno.env.get("SUPABASE_URL")!).hostname;
+    return parsed.hostname === supabaseHost;
+  } catch { return false; }
+}
+
 async function fetchImageBase64(url: string): Promise<string | null> {
   try {
     const res = await fetch(url);
@@ -47,6 +56,21 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Validate the caller's JWT
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -74,7 +98,7 @@ Deno.serve(async (req) => {
     const cesLogoData = await fetchImageBase64(cesLogoUrl);
 
     let clientLogoData: string | null = null;
-    if (clientLogoUrl) {
+    if (clientLogoUrl && validateLogoUrl(clientLogoUrl)) {
       clientLogoData = await fetchImageBase64(clientLogoUrl);
     }
 
