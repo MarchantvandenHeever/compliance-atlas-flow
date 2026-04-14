@@ -178,7 +178,8 @@ export default function ClientDashboard() {
     const url = URL.createObjectURL(data);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${(selectedProject?.name || 'Report').replace(/\s+/g, '_')}_${selectedAudit?.period?.replace(/\s/g, '_') || 'report'}.${format}`;
+    const proj = projects.find((p: any) => p.id === selectedProject);
+    a.download = `${(proj?.name || 'Report').replace(/\s+/g, '_')}_report.${format}`;
     a.click();
     URL.revokeObjectURL(url);
   };
