@@ -142,10 +142,10 @@ export default function PhotoUpload({ responseId, photos, onPhotosChange, disabl
           continue;
         }
 
-        const { data: urlData } = supabase.storage.from('audit-photos').getPublicUrl(path);
+        const { data: signedUrlData } = await supabase.storage.from('audit-photos').createSignedUrl(path, 3600);
 
         newPhotos.push({
-          url: urlData.publicUrl,
+          url: signedUrlData?.signedUrl || '',
           caption: '',
           gpsLocation,
           exifDate: exif.date || new Date().toISOString(),

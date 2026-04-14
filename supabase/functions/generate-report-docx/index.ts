@@ -118,6 +118,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate the caller's JWT
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -145,8 +159,12 @@ Deno.serve(async (req) => {
     } catch { /* ignore */ }
     if (clientLogoUrl) {
       try {
-        const res = await fetch(clientLogoUrl);
-        if (res.ok) clientLogoBuffer = new Uint8Array(await res.arrayBuffer());
+        const supabaseHost = new URL(Deno.env.get("SUPABASE_URL")!).hostname;
+        const parsed = new URL(clientLogoUrl);
+        if (parsed.protocol === 'https:' && parsed.hostname === supabaseHost) {
+          const res = await fetch(clientLogoUrl);
+          if (res.ok) clientLogoBuffer = new Uint8Array(await res.arrayBuffer());
+        }
       } catch { /* ignore */ }
     }
 
