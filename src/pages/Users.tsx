@@ -314,8 +314,9 @@ export default function Users() {
                   <TableHead>Name</TableHead>
                   <TableHead>Current Roles</TableHead>
                   <TableHead>Assign Role</TableHead>
-                  <TableHead>Client Organisation</TableHead>
-                </TableRow>
+                   <TableHead>Client Organisation</TableHead>
+                   <TableHead className="w-[60px]"></TableHead>
+                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(profiles || []).map(profile => {
@@ -425,7 +426,19 @@ export default function Users() {
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </TableCell>
+                       </TableCell>
+                       <TableCell>
+                         {profile.user_id !== user?.id && (
+                           <Button
+                             size="icon"
+                             variant="ghost"
+                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                             onClick={() => setDeleteTarget({ userId: profile.user_id, name: profile.display_name || 'this user' })}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         )}
+                       </TableCell>
                     </TableRow>
                   );
                 })}
