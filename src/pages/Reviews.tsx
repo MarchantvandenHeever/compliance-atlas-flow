@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import PhotoEvidenceGallery from '@/components/PhotoEvidenceGallery';
 import { useAuditInstances, useAuditResponses, useAuditSectionOverrides } from '@/hooks/useAuditData';
 import { useTemplateSections, useTemplateObjectives, useTemplateItems } from '@/hooks/useTemplates';
 import { useProjects } from '@/hooks/useProjects';
