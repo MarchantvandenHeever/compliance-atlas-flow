@@ -112,6 +112,23 @@ export default function Users() {
     onError: (e: Error) => toast({ title: 'Error assigning client', description: e.message, variant: 'destructive' }),
   });
 
+  const deleteUser = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await supabase.functions.invoke('delete-user', {
+        body: { userId },
+      });
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-roles'] });
+      toast({ title: 'User deleted successfully' });
+      setDeleteTarget(null);
+    },
+    onError: (e: Error) => toast({ title: 'Error deleting user', description: e.message, variant: 'destructive' }),
+  });
+
   const getUserRoles = (userId: string): AppRole[] =>
     (roles || []).filter(r => r.user_id === userId).map(r => r.role);
 
