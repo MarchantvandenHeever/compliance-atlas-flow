@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, UserPlus, X } from 'lucide-react';
+import { Shield, UserPlus, X, Building2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -49,6 +49,16 @@ export default function Users() {
     enabled: !!user,
   });
 
+  const { data: organisations = [] } = useQuery({
+    queryKey: ['organisations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('organisations').select('*').order('name');
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   const addRole = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
       const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
@@ -71,6 +81,21 @@ export default function Users() {
       toast({ title: 'Role removed successfully' });
     },
     onError: (e: Error) => toast({ title: 'Error removing role', description: e.message, variant: 'destructive' }),
+  });
+
+  const assignClient = useMutation({
+    mutationFn: async ({ userId, organisationId }: { userId: string; organisationId: string | null }) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ organisation_id: organisationId })
+        .eq('user_id', userId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      toast({ title: 'Client assignment updated' });
+    },
+    onError: (e: Error) => toast({ title: 'Error assigning client', description: e.message, variant: 'destructive' }),
   });
 
   const getUserRoles = (userId: string): AppRole[] =>
@@ -101,6 +126,7 @@ export default function Users() {
                   <TableHead>Name</TableHead>
                   <TableHead>Current Roles</TableHead>
                   <TableHead>Assign Role</TableHead>
+                  <TableHead>Client Organisation</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -108,6 +134,8 @@ export default function Users() {
                   const userRoles = getUserRoles(profile.user_id);
                   const availableRoles = ALL_ROLES.filter(r => !userRoles.includes(r));
                   const selectedRole = addingRole[profile.user_id] || '';
+                  const isClientViewer = userRoles.includes('client_viewer');
+                  const assignedOrg = organisations.find(o => o.id === profile.organisation_id);
 
                   return (
                     <TableRow key={profile.id}>
@@ -169,6 +197,45 @@ export default function Users() {
                               <UserPlus className="h-3.5 w-3.5" />
                             </Button>
                           </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isClientViewer ? (
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={profile.organisation_id || 'none'}
+                              onValueChange={(v) => {
+                                assignClient.mutate({
+                                  userId: profile.user_id,
+                                  organisationId: v === 'none' ? null : v,
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[180px] h-8 text-xs">
+                                <SelectValue placeholder="Assign client..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">
+                                  <span className="text-muted-foreground">No client</span>
+                                </SelectItem>
+                                {organisations.map(org => (
+                                  <SelectItem key={org.id} value={org.id}>
+                                    <div className="flex items-center gap-2">
+                                      <Building2 className="h-3 w-3 text-muted-foreground" />
+                                      {org.name}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {assignedOrg && (
+                              <Badge variant="outline" className="text-xs whitespace-nowrap">
+                                {assignedOrg.name}
+                              </Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
                     </TableRow>
