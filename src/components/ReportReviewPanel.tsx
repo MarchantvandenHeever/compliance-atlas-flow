@@ -182,6 +182,18 @@ export default function ReportReviewPanel({ auditId, projectName, period, open, 
           )}
         </div>
 
+        {/* Photo Evidence */}
+        {auditPhotos.length > 0 && (
+          <div className="space-y-2 border rounded-lg p-3">
+            <button onClick={() => setShowPhotos(!showPhotos)}
+              className="flex items-center gap-1 text-sm font-semibold hover:text-primary transition-colors w-full">
+              📷 Audit Photo Evidence ({auditPhotos.length})
+              {showPhotos ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+            {showPhotos && <PhotoEvidenceGallery photos={auditPhotos} />}
+          </div>
+        )}
+
         {/* Reviewer Actions */}
         {isReviewer && !isLocked && (
           <div className="space-y-3 border rounded-lg p-3">
