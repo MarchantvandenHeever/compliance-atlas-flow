@@ -98,7 +98,7 @@ export default function ClientDashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.organisation_id && projects.length > 0,
+    enabled: myProjectIds.length > 0,
   });
 
   // Fetch responses for approved audits
