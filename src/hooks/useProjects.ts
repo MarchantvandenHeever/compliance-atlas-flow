@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export function useProjects(status?: string) {
+export function useProjects(status?: 'active' | 'completed' | 'on_hold') {
   const { user } = useAuth();
 
   return useQuery({
