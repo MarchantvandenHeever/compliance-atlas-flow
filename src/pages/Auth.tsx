@@ -3,6 +3,7 @@ import cesLogo from '@/assets/ces-logo.png';
 import { useAuth } from '@/contexts/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { lovable } from '@/integrations/lovable/index';
 
 export default function Auth() {
   const { user, loading } = useAuth();
