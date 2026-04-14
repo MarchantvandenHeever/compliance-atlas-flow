@@ -43,13 +43,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isClientOnly, location.pathname, navigate]);
 
-  const visibleNav = isClientOnly
-    ? clientNavItems
-    : navItems.filter(item => {
-        if ('adminOnly' in item && item.adminOnly) return roles.includes('admin');
-        if ('reviewerOnly' in item && item.reviewerOnly) return roles.includes('reviewer') || roles.includes('admin');
-        return true;
-      });
+  const visibleNav = !rolesLoaded
+    ? [] // hide nav while roles are loading
+    : isClientOnly
+      ? clientNavItems
+      : navItems.filter(item => {
+          if ('adminOnly' in item && item.adminOnly) return roles.includes('admin');
+          if ('reviewerOnly' in item && item.reviewerOnly) return roles.includes('reviewer') || roles.includes('admin');
+          return true;
+        });
 
   const initials = profile?.display_name
     ? profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
