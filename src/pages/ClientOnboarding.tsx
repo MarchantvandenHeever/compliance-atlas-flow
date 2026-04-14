@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Plus, Building2, Loader2, Trash2, Upload } from 'lucide-react';
+import { Plus, Building2, Loader2, Trash2, Upload, Pencil, Globe, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,14 +16,30 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 
+type OrgFormData = {
+  name: string;
+  primary_color: string;
+  website_url: string;
+  logoFile: File | null;
+  existingLogoUrl: string | null;
+};
+
+const emptyForm: OrgFormData = {
+  name: '',
+  primary_color: '#2563eb',
+  website_url: '',
+  logoFile: null,
+  existingLogoUrl: null,
+};
+
 export default function ClientOnboarding() {
   const { profile } = useAuth();
   const qc = useQueryClient();
-  const [newName, setNewName] = useState('');
-  const [newColor, setNewColor] = useState('#2563eb');
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [form, setForm] = useState<OrgFormData>({ ...emptyForm });
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
   const { data: orgs, isLoading } = useQuery({
     queryKey: ['organisations'],
@@ -34,34 +50,63 @@ export default function ClientOnboarding() {
     },
   });
 
-  const createOrg = useMutation({
-    mutationFn: async () => {
-      if (!newName.trim()) throw new Error('Organisation name is required');
+  const openCreate = () => {
+    setEditingId(null);
+    setForm({ ...emptyForm });
+    setDialogOpen(true);
+  };
 
-      let logoUrl: string | null = null;
-      if (logoFile) {
-        const ext = logoFile.name.split('.').pop();
-        const path = `org-logos/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('audit-photos').upload(path, logoFile);
-        if (upErr) throw upErr;
-        const { data: urlData } = supabase.storage.from('audit-photos').getPublicUrl(path);
-        logoUrl = urlData.publicUrl;
+  const openEdit = (org: any) => {
+    setEditingId(org.id);
+    setForm({
+      name: org.name,
+      primary_color: org.primary_color || '#2563eb',
+      website_url: org.website_url || '',
+      logoFile: null,
+      existingLogoUrl: org.logo_url,
+    });
+    setDialogOpen(true);
+  };
+
+  const uploadLogo = async (file: File): Promise<string> => {
+    const ext = file.name.split('.').pop();
+    const path = `org-logos/${Date.now()}.${ext}`;
+    const { error } = await supabase.storage.from('audit-photos').upload(path, file);
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from('audit-photos').getPublicUrl(path);
+    return urlData.publicUrl;
+  };
+
+  const saveOrg = useMutation({
+    mutationFn: async () => {
+      if (!form.name.trim()) throw new Error('Organisation name is required');
+
+      let logoUrl = form.existingLogoUrl;
+      if (form.logoFile) {
+        logoUrl = await uploadLogo(form.logoFile);
       }
 
-      const { error } = await supabase.from('organisations').insert({
-        name: newName.trim(),
-        primary_color: newColor,
+      const payload = {
+        name: form.name.trim(),
+        primary_color: form.primary_color,
         logo_url: logoUrl,
-      });
-      if (error) throw error;
+        website_url: form.website_url.trim() || null,
+      };
+
+      if (editingId) {
+        const { error } = await supabase.from('organisations').update(payload).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('organisations').insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['organisations'] });
-      toast.success('Client organisation created');
-      setNewName('');
-      setNewColor('#2563eb');
-      setLogoFile(null);
+      toast.success(editingId ? 'Organisation updated' : 'Organisation created');
       setDialogOpen(false);
+      setEditingId(null);
+      setForm({ ...emptyForm });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -79,6 +124,40 @@ export default function ClientOnboarding() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const autoFillFromWebsite = async () => {
+    const url = form.website_url.trim();
+    if (!url) {
+      toast.error('Enter a website URL first');
+      return;
+    }
+
+    setFetching(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('scrape-org-website', {
+        body: { url },
+      });
+      if (error) throw error;
+      if (!data) throw new Error('No data returned');
+
+      setForm(prev => ({
+        ...prev,
+        name: data.name || prev.name,
+        primary_color: data.primaryColor || prev.primary_color,
+      }));
+
+      if (data.logoUrl) {
+        setForm(prev => ({ ...prev, existingLogoUrl: data.logoUrl }));
+      }
+
+      toast.success('Auto-filled from website');
+    } catch (e: any) {
+      console.error('Auto-fill error:', e);
+      toast.error('Could not auto-fill. Please enter details manually.');
+    } finally {
+      setFetching(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
@@ -86,47 +165,7 @@ export default function ClientOnboarding() {
           <h2 className="text-xl font-bold font-display">Client Onboarding</h2>
           <p className="text-sm text-muted-foreground">Manage client organisations, logos, and branding</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus size={14} className="mr-1" /> New Client</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Client Organisation</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-1.5">
-                <Label>Organisation Name</Label>
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="e.g. Eskom Holdings" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Brand Colour</Label>
-                <div className="flex items-center gap-3">
-                  <input type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="w-10 h-10 rounded border cursor-pointer" />
-                  <Input value={newColor} onChange={e => setNewColor(e.target.value)} className="w-28 font-mono text-xs" />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Client Logo</Label>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" asChild>
-                    <label className="cursor-pointer">
-                      <Upload size={14} className="mr-1" /> Choose File
-                      <input type="file" accept="image/*" className="hidden" onChange={e => setLogoFile(e.target.files?.[0] || null)} />
-                    </label>
-                  </Button>
-                  {logoFile && <span className="text-xs text-muted-foreground truncate max-w-[160px]">{logoFile.name}</span>}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <DialogClose asChild><Button variant="ghost" size="sm">Cancel</Button></DialogClose>
-              <Button size="sm" onClick={() => createOrg.mutate()} disabled={createOrg.isPending}>
-                {createOrg.isPending && <Loader2 size={14} className="mr-1 animate-spin" />} Create
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" onClick={openCreate}><Plus size={14} className="mr-1" /> New Client</Button>
       </div>
 
       {isLoading ? (
@@ -157,11 +196,23 @@ export default function ClientOnboarding() {
                     <CardDescription className="text-xs">
                       Created {new Date(org.created_at).toLocaleDateString()}
                     </CardDescription>
+                    {(org as any).website_url && (
+                      <a href={(org as any).website_url} target="_blank" rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline flex items-center gap-1 mt-0.5">
+                        <Globe size={10} /> {(org as any).website_url.replace(/^https?:\/\//, '')}
+                      </a>
+                    )}
                   </div>
-                  <button onClick={() => setDeleteTarget({ id: org.id, name: org.name })}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive p-1">
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(org)}
+                      className="text-muted-foreground hover:text-primary p-1">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => setDeleteTarget({ id: org.id, name: org.name })}
+                      className="text-muted-foreground hover:text-destructive p-1">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
@@ -174,6 +225,62 @@ export default function ClientOnboarding() {
           ))}
         </div>
       )}
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={o => { if (!o) { setDialogOpen(false); setEditingId(null); } else setDialogOpen(true); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit' : 'Add'} Client Organisation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Website URL</Label>
+              <div className="flex gap-2">
+                <Input value={form.website_url} onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))}
+                  placeholder="https://example.co.za" className="flex-1" />
+                <Button type="button" variant="outline" size="sm" onClick={autoFillFromWebsite} disabled={fetching}>
+                  {fetching ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  <span className="ml-1 hidden sm:inline">Auto-fill</span>
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">Enter a URL and click Auto-fill to populate details from the website</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Organisation Name</Label>
+              <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Eskom Holdings" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Brand Colour</Label>
+              <div className="flex items-center gap-3">
+                <input type="color" value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))} className="w-10 h-10 rounded border cursor-pointer" />
+                <Input value={form.primary_color} onChange={e => setForm(f => ({ ...f, primary_color: e.target.value }))} className="w-28 font-mono text-xs" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Client Logo</Label>
+              <div className="flex items-center gap-2">
+                {(form.existingLogoUrl && !form.logoFile) && (
+                  <img src={form.existingLogoUrl} alt="Current logo" className="w-8 h-8 rounded object-contain bg-muted p-0.5" />
+                )}
+                <Button variant="outline" size="sm" asChild>
+                  <label className="cursor-pointer">
+                    <Upload size={14} className="mr-1" /> {form.existingLogoUrl ? 'Replace' : 'Choose File'}
+                    <input type="file" accept="image/*" className="hidden" onChange={e => setForm(f => ({ ...f, logoFile: e.target.files?.[0] || null }))} />
+                  </label>
+                </Button>
+                {form.logoFile && <span className="text-xs text-muted-foreground truncate max-w-[160px]">{form.logoFile.name}</span>}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild><Button variant="ghost" size="sm">Cancel</Button></DialogClose>
+            <Button size="sm" onClick={() => saveOrg.mutate()} disabled={saveOrg.isPending}>
+              {saveOrg.isPending && <Loader2 size={14} className="mr-1 animate-spin" />}
+              {editingId ? 'Save Changes' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
