@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, FolderKanban, ClipboardCheck, BarChart3,
   AlertTriangle, FileText, Settings, ChevronLeft, ChevronRight, Menu, X, LogOut, Shield, UserPlus, Eye
@@ -22,11 +22,33 @@ const navItems = [
   { to: '/report-reviews', icon: FileText, label: 'Report Reviews', reviewerOnly: true },
 ] as const;
 
+const clientNavItems = [
+  { to: '/client-dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+] as const;
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { profile, roles, signOut } = useAuth();
+
+  const isClientOnly = roles.length > 0 && roles.every(r => r === 'client_viewer');
+
+  // Redirect client-only users to client dashboard
+  useEffect(() => {
+    if (isClientOnly && location.pathname === '/') {
+      navigate('/client-dashboard', { replace: true });
+    }
+  }, [isClientOnly, location.pathname, navigate]);
+
+  const visibleNav = isClientOnly
+    ? clientNavItems
+    : navItems.filter(item => {
+        if ('adminOnly' in item && item.adminOnly) return roles.includes('admin');
+        if ('reviewerOnly' in item && item.reviewerOnly) return roles.includes('reviewer') || roles.includes('admin');
+        return true;
+      });
 
   const initials = profile?.display_name
     ? profile.display_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
