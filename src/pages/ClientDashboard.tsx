@@ -56,7 +56,7 @@ export default function ClientDashboard() {
 
   // Fetch approved audits only
   const { data: approvedAudits = [] } = useQuery({
-    queryKey: ['client-approved-audits', profile?.organisation_id, selectedProject],
+    queryKey: ['client-approved-audits', myProjectIds, selectedProject],
     queryFn: async () => {
       let query = supabase
         .from('audit_instances')
@@ -67,8 +67,7 @@ export default function ClientDashboard() {
       if (selectedProject) {
         query = query.eq('project_id', selectedProject);
       } else {
-        const projectIds = projects.map(p => p.id);
-        if (projectIds.length > 0) query = query.in('project_id', projectIds);
+        if (myProjectIds.length > 0) query = query.in('project_id', myProjectIds);
         else return [];
       }
 
@@ -76,12 +75,12 @@ export default function ClientDashboard() {
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.organisation_id && projects.length > 0,
+    enabled: myProjectIds.length > 0,
   });
 
   // Fetch all audits (for status overview, not detailed data)
   const { data: allAudits = [] } = useQuery({
-    queryKey: ['client-all-audits', profile?.organisation_id, selectedProject],
+    queryKey: ['client-all-audits', myProjectIds, selectedProject],
     queryFn: async () => {
       let query = supabase
         .from('audit_instances')
@@ -91,8 +90,7 @@ export default function ClientDashboard() {
       if (selectedProject) {
         query = query.eq('project_id', selectedProject);
       } else {
-        const projectIds = projects.map(p => p.id);
-        if (projectIds.length > 0) query = query.in('project_id', projectIds);
+        if (myProjectIds.length > 0) query = query.in('project_id', myProjectIds);
         else return [];
       }
 
